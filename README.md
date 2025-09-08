@@ -17,5 +17,7 @@ B5: Chạy lệnh ```npx prisma migrate deploy```
 B6: Chạy lệnh ```npm start``` để khởi động server 
 # Cách upload lên github
 B1: ```git add .```
+
 B2: ```git commit -sm"<Thông-Điệp>"```
+
 B3: ```git push orin <Tên-nhánh>```
