@@ -1,12 +1,11 @@
+//=================Gọi các module=======================
 const dotenv = require('dotenv');
 dotenv.config({ path: './config.env' });
 const app = require('./app');
-const pool = require('./utils/db');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('./utils/db');
+//======================================================
 
-const prisma = new PrismaClient();
-
-//Kết nối SQL ở đây
+//Kết nối PostgreSQL
 async function connectDB() {
   try {
     await prisma.$connect();
@@ -17,11 +16,13 @@ async function connectDB() {
   }
 }
 connectDB();
-//----------------------
+//===================
+//Chạy server
 const server = app.listen(process.env.PORT, () => {
   console.log(`Ứng dụng đang chạy trên cổng ${process.env.PORT}...`);
 });
-
+//============
+//==================Xử lý có lỗi khi chạy ứng dụng thì ngừng ngay server==================
 process.on('unhandledRejection', (err) => {
   console.log('🚨 LỖI KHÔNG XỬ LÝ:', err.name, err.message);
   console.log('Đang tắt ứng dụng...');
@@ -45,3 +46,4 @@ process.on('SIGTERM', async () => {
     console.log('💥 Process terminated!');
   });
 });
+//========================================================================================

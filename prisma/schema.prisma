@@ -19,6 +19,8 @@ model User {
   password_hash String  @db.VarChar(255) @map("password_hash")
   role         UserRole @default(user)
   created_at   DateTime @default(now()) @db.Timestamptz @map("created_at")
-
+  password_changed_at DateTime? @db.Timestamptz
+  password_reset_token   String?   @db.VarChar(255)
+  password_reset_expires DateTime?
   @@map("users")
 }
