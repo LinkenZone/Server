@@ -5,6 +5,7 @@ const { promisify } = require('util');
 const crypto = require('crypto');
 const userService = require('./../services/userService');
 const prisma = require('../utils/db');
+const bcrypt = require('bcryptjs');
 //=====================Phương thức bổ trợ====================
 const signToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -135,6 +136,7 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
   res.status(202).json({
     status: 'success',
     resetToken,
+    resetURL,
   });
 });
 
@@ -148,8 +150,8 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
 
   const user = await prisma.user.findFirst({
     where: {
-      passwordResetToken: hashedToken,
-      passwordResetExpires: {
+      password_reset_token: hashedToken,
+      password_reset_expires: {
         gt: new Date(), // so sánh thời gian hiện tại
       },
     },
@@ -162,9 +164,9 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
   //3. Cập nhật db
   const hashedPassword = await bcrypt.hash(req.body.password, 12);
   const updatedUser = await prisma.user.update({
-    where: { id: user.id },
+    where: { user_id: user.user_id },
     data: {
-      password: hashedPassword, // nhớ hash trước khi lưu
+      password_hash: hashedPassword, // nhớ hash trước khi lưu
       password_reset_token: null,
       password_reset_expires: null,
     },
@@ -176,23 +178,24 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
 exports.updatePassword = catchAsync(async (req, res, next) => {
   //1. Xác thực user
   const user = await prisma.user.findUnique({
-    where: { id: req.user.id },
+    where: { user_id: req.user.user_id },
   });
   //2. Xác thực password được gửi đến
   if (
     !(await userService.correctPassword(
       req.body.passwordCurrent,
-      user.password
+      user.password_hash
     ))
   ) {
     return next(new appError('Mật khẩu không trùng khớp', 401));
   }
   //3. Cập nhật mật khẩu
+  const newHashedPassword = await bcrypt.hash(req.body.password, 12);
   const updatedUser = await prisma.user.update({
-    where: { id: user.id },
+    where: { user_id: user.user_id },
     data: {
-      password: newHashedPassword,
-      passwordChangedAt: new Date(), // nếu bạn có cột này để bảo mật JWT
+      password_hash: newHashedPassword,
+      password_changed_at: new Date(),
     },
   });
   //4. Gửi lại JWT cho người dùng
