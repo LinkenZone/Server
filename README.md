@@ -20,4 +20,4 @@ B1: ```git add .```
 
 B2: ```git commit -sm"<Thông-Điệp>"```
 
-B3: ```git push orin <Tên-nhánh>```
+B3: ```git push origin <Tên-nhánh>```
