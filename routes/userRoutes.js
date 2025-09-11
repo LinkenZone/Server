@@ -1,22 +1,13 @@
-// const express = require('express');
+const express = require('express');
 // const userController = require('./../controllers/userController');
-// const authController = require('./../controllers/authController');
+const authController = require('./../controllers/authController');
 
-// const router = express.Router();
-// //==========================Xác thực=====================================
-// router.post('/signup', authController.signUp);
-// router.post('/login', authController.signIn);
-// router.post('/forgetpassword', authController.forgotPassword);
-// router.patch('/resetpassword/:token', authController.resetPassword);
-// router.patch(
-//   '/updatepassword',
-//   authController.protect,
-//   authController.updatePassword
-// );
+const router = express.Router();
+//==========================Xác thực=====================================
 
 // router.patch('/updateme', authController.protect, userController.updateMe);
 // router.delete('/deleteme', authController.protect, userController.deleteMe);
-// //========================================================================
+//========================================================================
 // router
 //   .route('/')
 //   .get(userController.getAllUsers)
