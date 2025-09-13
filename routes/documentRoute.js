@@ -1,11 +1,18 @@
 const express = require('express');
 const documentController = require('./../controllers/documentController');
+const authController = require('./../controllers/authController');
+const { upload } = require('../services/cloudinary_service');
 
 const router = express.Router();
 
+// Route upload file đầy đủ (upload + tạo record trong DB)
 router
   .route('/')
-  .post(documentController.uploadFile)
+  .post(
+    authController.protect,
+    upload.single('file'),
+    documentController.uploadFile
+  )
   .get(documentController.getAllFile);
 
 router.get('/my-documents', documentController.getMyFile);
