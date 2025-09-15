@@ -12,22 +12,25 @@ router
     authController.protect,
     upload.single('file'),
     documentController.uploadFile
-  )
-  .get(documentController.getAllFile);
+  );
 
-router.get('/my-documents', documentController.getMyFile);
+// Route lấy documents của user hiện tại (cần authentication)
+router.get(
+  '/my-documents',
+  authController.protect,
+  documentController.getMyFile
+);
+
+router.get(
+  '/my-deleted-documents',
+  authController.protect,
+  documentController.getDeletedFile
+);
 
 router
   .route('/:id')
   .get(documentController.getFileDetails)
-  .patch(documentController.updateFileDetails)
-  .delete(documentController.deleteFileDetails);
-
-router
-  .route('/:id/comments')
-  .get(documentController.getAllComments)
-  .post(documentController.addComment);
-
-router.post('/:id/ratings', documentController.addRating);
+  .patch(authController.protect, documentController.updateFile)
+  .delete(authController.protect, documentController.deleteFile);
 
 module.exports = router;

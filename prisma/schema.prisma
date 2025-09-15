@@ -59,31 +59,35 @@ model Lecturer {
 }
 
 model Document {
-  document_id  Int            @id @default(autoincrement()) @map("document_id")
-  title        String         @db.VarChar(255)
-  description  String?        @db.Text
-  file_url     String         @db.VarChar(255) @map("file_url")
-  file_type    String?        @db.VarChar(50) @map("file_type")
-  status       DocumentStatus @default(pending)
-  uploader_id  Int?           @map("uploader_id")
-  subject_id   Int?           @map("subject_id")
-  lecturer_id  Int?           @map("lecturer_id")
-  uploaded_at  DateTime       @default(now()) @db.Timestamptz @map("uploaded_at")
-  approved_at  DateTime?      @db.Timestamptz @map("approved_at")
-  
+  document_id   Int            @id @default(autoincrement()) @map("document_id")
+  title         String         @db.VarChar(255)
+  description   String?        @db.Text
+  file_url      String         @db.VarChar(255) @map("file_url")
+  file_type     String?        @db.VarChar(100) @map("file_type")
+  status        DocumentStatus @default(pending)
+  uploader_id   Int?           @map("uploader_id")
+  subject_id    Int?           @map("subject_id")
+  lecturer_id   Int?           @map("lecturer_id")
+  uploaded_at   DateTime       @default(now()) @db.Timestamptz @map("uploaded_at")
+  approved_at   DateTime?      @db.Timestamptz @map("approved_at")
+  is_deleted    Boolean        @default(false) @map("is_deleted") 
+  deleted_at    DateTime?      @db.Timestamptz @map("deleted_at") 
+
   // Relations
   uploader User?     @relation("DocumentUploader", fields: [uploader_id], references: [user_id], onDelete: SetNull)
   subject  Subject?  @relation(fields: [subject_id], references: [subject_id], onDelete: SetNull)
   lecturer Lecturer? @relation(fields: [lecturer_id], references: [lecturer_id], onDelete: SetNull)
   ratings  Rating[]
   comments Comment[]
-  
+
   // Indexes
   @@index([uploader_id])
   @@index([subject_id])
   @@index([lecturer_id])
+  @@index([is_deleted])
   @@map("documents")
 }
+
 
 model Rating {
   rating_id   Int      @id @default(autoincrement()) @map("rating_id")
