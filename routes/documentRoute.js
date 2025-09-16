@@ -33,4 +33,10 @@ router
   .patch(authController.protect, documentController.updateFile)
   .delete(authController.protect, documentController.deleteFile);
 
+// Khôi phục file
+router.patch(
+  '/restore',
+  authController.protect,
+  documentController.restoreFile
+);
 module.exports = router;
