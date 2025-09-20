@@ -162,3 +162,38 @@ exports.restoreFile = catchAsync(async (req, res, next) => {
     },
   });
 });
+
+exports.approveFile = catchAsync(async (req, res, next) => {
+  const document_id = Number(req.params.id);
+  const document = await documentService.getDocumentByID(document_id);
+
+  if (!document) {
+    return next(new AppError('Không tìm thấy file trong hệ thống', 404));
+  }
+
+  const approvedDocument = await documentService.approveDocument(document_id);
+  res.status(200).json({
+    status: 'success',
+    message: 'Duyệt file thành công',
+    data: {
+      approvedDocument,
+    },
+  });
+});
+
+exports.searchDocuments = catchAsync(async (req, res, next) => {
+  const query = req.query.q || '';
+  const results = await documentService.searchDocuments(query);
+
+  if (!results || results.length === 0) {
+    return next(new AppError('Không tìm thấy tài liệu phù hợp', 404));
+  }
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Tìm kiếm tài liệu thành công',
+    data: {
+      documents: results,
+    },
+  });
+});

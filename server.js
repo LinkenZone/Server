@@ -3,7 +3,7 @@ const dotenv = require('dotenv');
 dotenv.config({ path: './config.env' });
 const app = require('./app');
 const prisma = require('./utils/db');
-const elastic = require('./utils/elastic');
+const { elastic } = require('./utils/elastic');
 //======================================================
 
 //Kết nối PostgreSQL
@@ -32,7 +32,6 @@ connectElastic();
 async function initES() {
   const exists = await elastic.indices.exists({ index: 'documents' });
   if (exists) {
-    console.log('Index documents đã tồn tại');
     return;
   }
 
@@ -56,7 +55,6 @@ async function initES() {
       },
     },
   });
-  console.log('Index documents đã được tạo');
 }
 initES();
 //===================

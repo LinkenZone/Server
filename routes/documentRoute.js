@@ -39,4 +39,13 @@ router.patch(
   authController.protect,
   documentController.restoreFile
 );
+// Duyệt file
+router.patch(
+  '/approve/:id',
+  authController.protect,
+  documentController.approveFile
+);
+// Tìm kiếm tài liệu
+router.get('/search', documentController.searchDocuments);
+
 module.exports = router;

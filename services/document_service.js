@@ -1,10 +1,11 @@
 const prisma = require('../utils/db');
+const { indexDocument } = require('../utils/elastic');
 
 // Tạo 1 dữ liệu trong bảng document
 async function createDocumentRecord(uploadResult, documentData, userId) {
   const { title, description, subject_id, lecturer_id } = documentData;
   // Tạo document mới trong database
-  return prisma.document.create({
+  const newDoc = await prisma.document.create({
     data: {
       title,
       description,
@@ -25,6 +26,9 @@ async function createDocumentRecord(uploadResult, documentData, userId) {
       },
     },
   });
+  // Gửi dữ liệu document mới lên Elasticsearch để lập chỉ mục
+  await indexDocument(newDoc);
+  return newDoc;
 }
 
 // Lấy toàn bộ dữ liệu của người dùng
@@ -101,13 +105,34 @@ async function restoredDocument(id) {
 }
 
 async function updateDocument(id, title, description) {
-  return prisma.document.update({
+  const updatedDoc = await prisma.document.update({
     where: { document_id: id },
     data: {
       title,
       description,
     },
   });
+  // Cập nhật dữ liệu tài liệu trong Elasticsearch
+  await indexDocument(updatedDoc);
+  return updatedDoc;
+}
+
+async function approveDocument(id) {
+  const approvedDoc = await prisma.document.update({
+    where: { document_id: id },
+    data: {
+      status: 'approved',
+      approved_at: new Date(),
+    },
+  });
+  // Cập nhật dữ liệu tài liệu trong Elasticsearch
+  await indexDocument(approvedDoc);
+  return approvedDoc;
+}
+
+async function searchDocuments(query) {
+  const results = await searchDocuments(query);
+  return results.map((hit) => hit._source);
 }
 
 module.exports = {
@@ -119,4 +144,6 @@ module.exports = {
   getCommentCount,
   restoredDocument,
   updateDocument,
+  approveDocument,
+  searchDocuments,
 };
