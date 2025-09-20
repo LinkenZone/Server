@@ -3,6 +3,7 @@ const dotenv = require('dotenv');
 dotenv.config({ path: './config.env' });
 const app = require('./app');
 const prisma = require('./utils/db');
+const elastic = require('./utils/elastic');
 //======================================================
 
 //Kết nối PostgreSQL
@@ -16,6 +17,48 @@ async function connectDB() {
   }
 }
 connectDB();
+//Kết nối Elasticsearch
+async function connectElastic() {
+  try {
+    await elastic.ping();
+    console.log('✅ Kết nối Elasticsearch thành công');
+  } catch (err) {
+    console.error('❌ Lỗi kết nối Elasticsearch:', err);
+    process.exit(1);
+  }
+}
+connectElastic();
+//Khởi tạo index trong Elasticsearch nếu chưa có
+async function initES() {
+  const exists = await elastic.indices.exists({ index: 'documents' });
+  if (exists) {
+    console.log('Index documents đã tồn tại');
+    return;
+  }
+
+  await elastic.indices.create({
+    index: 'documents',
+    body: {
+      mappings: {
+        properties: {
+          title: { type: 'text' },
+          description: { type: 'text' },
+          file_url: { type: 'keyword' },
+          file_type: { type: 'keyword' },
+          uploader_id: { type: 'integer' },
+          uploader_name: { type: 'text' },
+          uploader_email: { type: 'keyword' },
+          subject_id: { type: 'integer' },
+          lecturer_id: { type: 'integer' },
+          status: { type: 'keyword' },
+          created_at: { type: 'date' },
+        },
+      },
+    },
+  });
+  console.log('Index documents đã được tạo');
+}
+initES();
 //===================
 //Chạy server
 const server = app.listen(process.env.PORT, () => {
