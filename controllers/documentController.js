@@ -146,8 +146,9 @@ exports.deleteFile = catchAsync(async (req, res, next) => {
 });
 
 exports.restoreFile = catchAsync(async (req, res, next) => {
-  const document_id = Number(req.body.document_id);
-
+  const document_id = req.body.document_id;
+  console.log('----------------------');
+  console.log(document_id);
   const document = await documentService.getDocumentByID(document_id);
 
   if (!document) {
