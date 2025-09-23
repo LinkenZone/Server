@@ -70,18 +70,65 @@ async function getCommentCount(documentId) {
 // Lấy tài liệu theo document cần thiết
 // Cần bổ sung thêm lấy các bình luận
 async function getDocumentByID(id) {
-  const doc = prisma.document.findUnique({
-    where: { document_id: id },
+  // Chuyển đổi id thành số nguyên
+  const documentId = parseInt(id);
+
+  if (isNaN(documentId)) {
+    throw new Error('Document ID phải là một số hợp lệ');
+  }
+
+  // Lấy document với await
+  const doc = await prisma.document.findUnique({
+    where: { document_id: documentId },
+    include: {
+      uploader: {
+        select: {
+          user_id: true,
+          full_name: true,
+          email: true,
+        },
+      },
+      subject: {
+        select: {
+          subject_id: true,
+          subject_name: true,
+          subject_code: true,
+        },
+      },
+      lecturer: {
+        select: {
+          lecturer_id: true,
+          lecturer_name: true,
+        },
+      },
+    },
   });
 
-  doc.ratings = getAverageRating(doc.document_id);
-  return doc;
+  if (!doc) {
+    return null;
+  }
+
+  // Lấy thông tin bổ sung
+  const avgRating = await getAverageRating(doc.document_id);
+  const commentCount = await getCommentCount(doc.document_id);
+
+  return {
+    ...doc,
+    avgRating,
+    commentCount,
+  };
 }
 
 // Xóa tài liệu
 async function deleteDocument(id) {
+  const documentId = parseInt(id);
+
+  if (isNaN(documentId)) {
+    throw new Error('Document ID phải là một số hợp lệ');
+  }
+
   return prisma.document.update({
-    where: { document_id: id },
+    where: { document_id: documentId },
     data: {
       is_deleted: true,
       deleted_at: new Date(),
@@ -90,9 +137,15 @@ async function deleteDocument(id) {
 }
 
 // Khôi phục tài liệu
-async function restoredDocument(id) {
+async function restoreDocument(id) {
+  const documentId = parseInt(id);
+
+  if (isNaN(documentId)) {
+    throw new Error('Document ID phải là một số hợp lệ');
+  }
+
   return prisma.document.update({
-    where: { document_id: id },
+    where: { document_id: documentId },
     data: {
       is_deleted: false,
       deleted_at: null,
@@ -101,12 +154,47 @@ async function restoredDocument(id) {
 }
 
 async function updateDocument(id, title, description) {
+  const documentId = parseInt(id);
+
+  if (isNaN(documentId)) {
+    throw new Error('Document ID phải là một số hợp lệ');
+  }
+
   return prisma.document.update({
-    where: { document_id: id },
+    where: { document_id: documentId },
     data: {
       title,
       description,
     },
+    include: {
+      uploader: {
+        select: {
+          user_id: true,
+          full_name: true,
+          email: true,
+        },
+      },
+      subject: {
+        select: {
+          subject_id: true,
+          subject_name: true,
+          subject_code: true,
+        },
+      },
+      lecturer: {
+        select: {
+          lecturer_id: true,
+          lecturer_name: true,
+        },
+      },
+    },
+  });
+}
+
+// Đếm số lượng documents theo điều kiện
+async function countDocument(whereCondition) {
+  return prisma.document.count({
+    where: whereCondition,
   });
 }
 
@@ -117,6 +205,7 @@ module.exports = {
   deleteDocument,
   getAverageRating,
   getCommentCount,
-  restoredDocument,
+  restoreDocument,
   updateDocument,
+  countDocument,
 };

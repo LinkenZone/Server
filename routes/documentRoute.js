@@ -27,16 +27,17 @@ router.get(
   documentController.getDeletedFile
 );
 
-router
-  .route('/:id')
-  .get(documentController.getFileDetails)
-  .patch(authController.protect, documentController.updateFile)
-  .delete(authController.protect, documentController.deleteFile);
-
 // Khôi phục file
 router.patch(
   '/restore',
   authController.protect,
   documentController.restoreFile
 );
+
+router
+  .route('/:id')
+  .get(documentController.getFileDetails)
+  .patch(authController.protect, documentController.updateFile)
+  .delete(authController.protect, documentController.deleteFile);
+
 module.exports = router;
