@@ -27,25 +27,25 @@ router.get(
   documentController.getDeletedFile
 );
 
-router
-  .route('/:id')
-  .get(documentController.getFileDetails)
-  .patch(authController.protect, documentController.updateFile)
-  .delete(authController.protect, documentController.deleteFile);
-
 // Khôi phục file
 router.patch(
   '/restore',
   authController.protect,
   documentController.restoreFile
 );
+// Tìm kiếm tài liệu
+router.get('/search', documentController.searchFiles);
+
+router
+  .route('/:id')
+  .get(documentController.getFileDetails)
+  .patch(authController.protect, documentController.updateFile)
+  .delete(authController.protect, documentController.deleteFile);
 // Duyệt file
 router.patch(
   '/approve/:id',
   authController.protect,
   documentController.approveFile
 );
-// Tìm kiếm tài liệu
-router.get('/search', documentController.searchDocuments);
 
 module.exports = router;

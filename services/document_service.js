@@ -1,5 +1,10 @@
 const prisma = require('../utils/db');
-const { indexDocument } = require('../utils/elastic');
+const {
+  indexDocument,
+  updateES,
+  deleteES,
+  search,
+} = require('../utils/elastic');
 
 // Tạo 1 dữ liệu trong bảng document
 async function createDocumentRecord(uploadResult, documentData, userId) {
@@ -26,9 +31,20 @@ async function createDocumentRecord(uploadResult, documentData, userId) {
       },
     },
   });
+  // Kết hợp thông tin upload vào document mới tạo
+  const newDocWithUpload = {
+    ...newDoc,
+    upload: {
+      fileUrl: uploadResult.fileUrl,
+      fileType: uploadResult.fileType,
+      fileName: uploadResult.fileName,
+      fileSize: uploadResult.fileSize,
+      publicId: uploadResult.publicId,
+    },
+  };
   // Gửi dữ liệu document mới lên Elasticsearch để lập chỉ mục
-  await indexDocument(newDoc);
-  return newDoc;
+  await indexDocument(newDocWithUpload);
+  return newDocWithUpload;
 }
 
 // Lấy toàn bộ dữ liệu của người dùng
@@ -74,49 +90,143 @@ async function getCommentCount(documentId) {
 // Lấy tài liệu theo document cần thiết
 // Cần bổ sung thêm lấy các bình luận
 async function getDocumentByID(id) {
-  const doc = prisma.document.findUnique({
-    where: { document_id: id },
+  // Chuyển đổi id thành số nguyên
+  const documentId = parseInt(id);
+
+  if (isNaN(documentId)) {
+    throw new Error('Document ID phải là một số hợp lệ');
+  }
+
+  // Lấy document với await
+  const doc = await prisma.document.findUnique({
+    where: { document_id: documentId },
+    include: {
+      uploader: {
+        select: {
+          user_id: true,
+          full_name: true,
+          email: true,
+        },
+      },
+      subject: {
+        select: {
+          subject_id: true,
+          subject_name: true,
+          subject_code: true,
+        },
+      },
+      lecturer: {
+        select: {
+          lecturer_id: true,
+          lecturer_name: true,
+        },
+      },
+    },
   });
 
-  doc.ratings = getAverageRating(doc.document_id);
-  return doc;
+  if (!doc) {
+    return null;
+  }
+
+  // Lấy thông tin bổ sung
+  const avgRating = await getAverageRating(doc.document_id);
+  const commentCount = await getCommentCount(doc.document_id);
+
+  return {
+    ...doc,
+    avgRating,
+    commentCount,
+  };
 }
 
 // Xóa tài liệu
 async function deleteDocument(id) {
-  return prisma.document.update({
-    where: { document_id: id },
+  const documentId = parseInt(id);
+
+  if (isNaN(documentId)) {
+    throw new Error('Document ID phải là một số hợp lệ');
+  }
+
+  const deletedDoc = await prisma.document.update({
+    where: { document_id: documentId },
     data: {
       is_deleted: true,
       deleted_at: new Date(),
     },
   });
+  // Xóa tài liệu trong Elasticsearch
+  await deleteES(deletedDoc.document_id);
+  return deletedDoc;
 }
 
 // Khôi phục tài liệu
-async function restoredDocument(id) {
-  return prisma.document.update({
-    where: { document_id: id },
+async function restoreDocument(id) {
+  const documentId = parseInt(id);
+
+  if (isNaN(documentId)) {
+    throw new Error('Document ID phải là một số hợp lệ');
+  }
+
+  const restoreDoc = await prisma.document.update({
+    where: { document_id: documentId },
     data: {
       is_deleted: false,
       deleted_at: null,
     },
   });
+  // Cập nhật lại tài liệu trong Elasticsearch
+  await updateES(restoreDoc);
+  return restoreDoc;
 }
 
 async function updateDocument(id, title, description) {
+  const documentId = parseInt(id);
+
+  if (isNaN(documentId)) {
+    throw new Error('Document ID phải là một số hợp lệ');
+  }
+
   const updatedDoc = await prisma.document.update({
-    where: { document_id: id },
+    where: { document_id: documentId },
     data: {
       title,
       description,
     },
+    include: {
+      uploader: {
+        select: {
+          user_id: true,
+          full_name: true,
+          email: true,
+        },
+      },
+      subject: {
+        select: {
+          subject_id: true,
+          subject_name: true,
+          subject_code: true,
+        },
+      },
+      lecturer: {
+        select: {
+          lecturer_id: true,
+          lecturer_name: true,
+        },
+      },
+    },
   });
   // Cập nhật dữ liệu tài liệu trong Elasticsearch
-  await indexDocument(updatedDoc);
+  await updateES(updatedDoc);
   return updatedDoc;
 }
 
+// Đếm số lượng documents theo điều kiện
+async function countDocument(whereCondition) {
+  return prisma.document.count({
+    where: whereCondition,
+  });
+}
+// Duyệt tài liệu
 async function approveDocument(id) {
   const approvedDoc = await prisma.document.update({
     where: { document_id: id },
@@ -131,8 +241,16 @@ async function approveDocument(id) {
 }
 
 async function searchDocuments(query) {
-  const results = await searchDocuments(query);
-  return results.map((hit) => hit._source);
+  try {
+    if (!query || query.trim() === '') {
+      return [];
+    }
+    const results = await search(query);
+    return results.map((hit) => hit._source);
+  } catch (error) {
+    console.error('Error searching documents:', error);
+    throw error;
+  }
 }
 
 module.exports = {
@@ -142,8 +260,9 @@ module.exports = {
   deleteDocument,
   getAverageRating,
   getCommentCount,
-  restoredDocument,
+  restoreDocument,
   updateDocument,
+  countDocument,
   approveDocument,
   searchDocuments,
 };

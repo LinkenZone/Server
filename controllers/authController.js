@@ -130,7 +130,7 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
   // 3. Tạo URL reset password
   const resetURL = `${req.protocol}://${req.get(
     'host'
-  )}/api/v1/users/resetPassword/${resetToken}`;
+  )}/api/v1/auth/resetPassword/${resetToken}`;
 
   //4. Gửi email (Bổ sung sau)
   res.status(202).json({
