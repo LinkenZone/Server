@@ -7,6 +7,7 @@ const app = express();
 const hpp = require('hpp');
 const authRoute = require('./routes/authRoute');
 const documentRoute = require('./routes/documentRoute');
+const adminRoute = require('./routes/adminRoute');
 app.use(helmet());
 
 //Đưa file tĩnh
@@ -45,9 +46,10 @@ app.use((req, res, next) => {
   next();
 });
 //===============================================
-// Ví dụ định nghĩa router
+// Định nghĩa router
 app.use('/api/v1/auth', authRoute);
 app.use('/api/v1/document', documentRoute);
+app.use('/api/v1/admin', adminRoute);
 // app.use('/api/v1/tours', tourRoute);
 // app.use('/api/v1/users', userRoute);
 // app.use('/api/v1/reviews', reviewRoute);

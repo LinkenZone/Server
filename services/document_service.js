@@ -1,4 +1,5 @@
 const prisma = require('../utils/db');
+const { upload } = require('./cloudinary_service');
 
 // Tạo 1 dữ liệu trong bảng document
 async function createDocumentRecord(uploadResult, documentData, userId) {
@@ -153,6 +154,85 @@ async function restoreDocument(id) {
   });
 }
 
+async function forceDeleteDocument(id) {
+  const documentId = parseInt(id);
+  if (isNaN(documentId)) {
+    throw new Error('Document ID phải là một số hợp lệ');
+  }
+  
+  //Xoá vĩnh viễn các bình luận liên quan
+  await prisma.comment.deleteMany({
+    where: { document_id: documentId },
+  });
+  //Xóa vĩnh viễn các đánh giá liên quan
+  await prisma.rating.deleteMany({
+    where: { document_id: documentId },
+  });
+
+  //xoá vĩnh viễn bài học
+  return prisma.document.delete({
+    where: { document_id: documentId },
+  });
+}
+
+async function rejectAndDeleteDocument(id, rejectionReason = 'Tài liệu không hợp lệ') {
+  const documentId = parseInt(id);
+  if (isNaN(documentId)) {
+    throw new Error('Document ID phải là một số hợp lệ');
+  }
+  // Lấy thông tin tài liệu trước khi xóa
+  const document = await prisma.document.findUnique({
+    where: { document_id: documentId },
+    include: {
+      uploader: {
+        select: {
+          user_id: true,
+          full_name: true,
+          email: true,
+        },
+      },
+      subject: {
+        select: {
+          subject_name: true,
+          subject_code: true,
+        },
+      },
+      lecturer: {
+        select: {
+          lecturer_name: true,
+        },
+      },
+    },
+  });
+
+  if (!document) {
+    throw new Error('Document không tồn tại');
+  }
+  //Xóa tài liệu bị từ chối
+  await prisma.comment.deleteMany({
+    where: { document_id: documentId },
+  });
+  await prisma.rating.deleteMany({
+    where: { document_id: documentId },
+  });
+  await prisma.document.delete({
+    where: { document_id: documentId },
+  }); 
+  return {
+    success: true,
+    action: 'rejected_and_deleted',
+    message: 'Tài liệu đã bị từ chối',
+    deletedDocument:{
+      title: document.title,
+      uploader: document.uploader,
+      subject: document.subject ?.subject_name,
+      lecturer: document.lecturer ?.lecturer_name,
+      rejectionReason,
+      deletedAt: new Date(),
+    }
+  };
+}
+
 async function updateDocument(id, title, description) {
   const documentId = parseInt(id);
 
@@ -207,5 +287,7 @@ module.exports = {
   getCommentCount,
   restoreDocument,
   updateDocument,
+  forceDeleteDocument,
+  rejectAndDeleteDocument,
   countDocument,
 };

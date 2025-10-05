@@ -127,6 +127,31 @@ exports.updateFile = catchAsync(async (req, res, next) => {
   });
 });
 
+// Từ chối và xóa tài liệu từ chối 
+exports.rejectFile = catchAsync(async (req, res, next) => {
+  if (!req.user || req.user.role !== 'admin') {
+    return next(new AppError('Chỉ admin mới có quyền từ chối tài liệu', 403));
+  }
+
+  const doc_id = Number(req.params.id);
+  const doc = await documentService.getDocumentByID(doc_id);
+  
+  if (!doc) {
+    return next(new AppError('Không tìm thấy tài liệu', 404));
+  }
+
+  if (doc.status !== 'pending') {
+    return next(new AppError('Chỉ có thể từ chối tài liệu đang chờ duyệt', 400));
+  }
+
+  const rejectDocument = await documentService.rejectAndDeleteDocument(doc_id, req.body.rejectionReason);
+  res.status(200).json({
+    status: 'success',
+    message: 'Từ chối và xóa tài liệu thành công',
+    data: { rejectDocument },
+  });
+});
+
 exports.deleteFile = catchAsync(async (req, res, next) => {
   // 1. Kiểm tra file có tồn tại bằng req.param.id
   const doc_id = Number(req.params.id);
