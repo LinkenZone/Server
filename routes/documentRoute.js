@@ -2,6 +2,8 @@ const express = require('express');
 const documentController = require('./../controllers/documentController');
 const authController = require('./../controllers/authController');
 const { upload } = require('../services/cloudinary_service');
+const commentRoute = require('./commentRoute');
+const ratingRoute = require('./ratingRoute');
 
 const router = express.Router();
 
@@ -47,5 +49,9 @@ router.patch(
   authController.protect,
   documentController.approveFile
 );
+// Gắn route bình luận vào document
+router.use('/:id/comment', commentRoute);
+// Gắn route đánh giá vào document
+router.use('/:id/rating', ratingRoute);
 
 module.exports = router;
