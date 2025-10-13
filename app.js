@@ -7,7 +7,17 @@ const app = express();
 const hpp = require('hpp');
 const authRoute = require('./routes/authRoute');
 const documentRoute = require('./routes/documentRoute');
+const cors = require('cors');
+
 app.use(helmet());
+
+app.use(
+  cors({
+    origin: 'http://localhost:5173',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
 
 //Đưa file tĩnh
 app.use(express.static(`${__dirname}/public`));
