@@ -58,9 +58,6 @@ app.use((req, res, next) => {
 // Ví dụ định nghĩa router
 app.use('/api/v1/auth', authRoute);
 app.use('/api/v1/document', documentRoute);
-// app.use('/api/v1/tours', tourRoute);
-// app.use('/api/v1/users', userRoute);
-// app.use('/api/v1/reviews', reviewRoute);
 
 app.all('*', (req, res, next) => {
   next(new AppError(`Không tìm thấy ${req.originalUrl} trên máy chủ`, 404));
