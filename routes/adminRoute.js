@@ -19,6 +19,6 @@ router.patch('/subjects/:id', adminController.updateSubject);
 router.delete('/subjects/:id', adminController.deleteSubject);
 
 router.post('/lecturers', adminController.createLecturer);//Cập nhật lại schema.prisma của Lecturer BỔ SUNG THÊM NHỮNG CÁI THÊM VÀO
-// router.delete('/lecturers/:id', adminController.deleteLecturer);
+router.delete('/lecturers/:id', adminController.deleteLecturer);
 
 module.exports = router;
