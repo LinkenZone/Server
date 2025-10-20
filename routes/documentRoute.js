@@ -29,6 +29,13 @@ router.get(
   documentController.getDeletedFile
 );
 
+//Từ chối và xóa tài liệu
+router.patch(
+  '/:id/reject',
+  authController.protect,
+  documentController.rejectAndDeleteDocument
+);
+
 // Khôi phục file
 router.patch(
   '/restore',
