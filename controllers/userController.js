@@ -1,78 +1,64 @@
-// const User = require('../Models/userModel');
-// const catchAsync = require('../utils/catchAsync');
-// const appError = require('../utils/appError');
+const catchAsync = require('../utils/catchAsync');
+const AppError = require('../utils/appError');
+const userService = require('../services/userService');
 
-// const filterObj = (obj, ...allowedFields) => {
-//   const newObj = {};
-//   Object.keys(obj).forEach((cur) => {
-//     if (allowedFields.includes(cur)) newObj[cur] = obj[cur];
-//   });
-//   return newObj;
-// };
-// exports.getAllUsers = catchAsync(async (req, res, next) => {
-//   const users = await User.find();
+// Get all users (admin)
+exports.getAllUsers = catchAsync(async (req, res, next) => {
+	const users = await userService.listUsers();
 
-//   res.status(200).json({
-//     status: 'success',
-//     results: users.length,
-//     data: {
-//       users,
-//     },
-//   });
-// });
+	res.status(200).json({
+		status: 'success',
+		results: users.length,
+		data: { users },
+	});
+});
 
-// exports.updateMe = catchAsync(async (req, res, next) => {
-//   //1. Tạo lỗi nếu user post password
-//   if (req.body.password || req.body.passwordConfirm) {
-//     return next(new appError('Không được cập nhật password ở đây', 400));
-//   }
-//   //2. Cập nhật user data
-//   const filteredBody = filterObj(req.body, 'name', 'email');
-//   const user = await User.findByIdAndUpdate(req.user.id, filteredBody, {
-//     new: true,
-//     runValidators: true,
-//   });
+// Get user details by id (admin)
+exports.getUserDetails = catchAsync(async (req, res, next) => {
+	const id = Number(req.params.id);
+	if (isNaN(id)) return next(new AppError('ID không hợp lệ', 400));
 
-//   res.status(200).json({
-//     status: 'success',
-//     data: {
-//       user,
-//     },
-//   });
-// });
+		const user = await userService.getUserById(id);
 
-// exports.deleteMe = catchAsync(async (req, res, next) => {
-//   await User.findByIdAndUpdate(req.user.id, { active: false });
+	if (!user) return next(new AppError('Không tìm thấy user', 404));
 
-//   res.status(202).json({
-//     status: 'success',
-//     data: null,
-//   });
-// });
-// exports.createUser = (req, res) => {
-//   res.status(500).json({
-//     status: 500,
-//     message: 'This route is currently unavailable',
-//   });
-// };
+	res.status(200).json({ status: 'success', data: { user } });
+});
 
-// exports.getUser = (req, res) => {
-//   res.status(500).json({
-//     status: 500,
-//     message: 'This route is currently unavailable',
-//   });
-// };
+// Ban user (soft ban) - admin
+exports.banUser = catchAsync(async (req, res, next) => {
+	const id = Number(req.params.id);
+	if (isNaN(id)) return next(new AppError('ID không hợp lệ', 400));
 
-// exports.updateUser = (req, res) => {
-//   res.status(500).json({
-//     status: 500,
-//     message: 'This route is currently unavailable',
-//   });
-// };
+		const updated = await userService.banUserById(id);
 
-// exports.deleteUser = (req, res) => {
-//   res.status(500).json({
-//     status: 500,
-//     message: 'This route is currently unavailable',
-//   });
-// };
+	if (updated.count === 0) return next(new AppError('Không tìm thấy user', 404));
+
+	res.status(200).json({ status: 'success', message: 'User đã bị cấm' });
+});
+
+// Unban user - admin
+exports.unbanUser = catchAsync(async (req, res, next) => {
+	const id = Number(req.params.id);
+	if (isNaN(id)) return next(new AppError('ID không hợp lệ', 400));
+
+		const updated = await userService.unbanUserById(id);
+
+	if (updated.count === 0) return next(new AppError('Không tìm thấy user', 404));
+
+	res.status(200).json({ status: 'success', message: 'User đã được gỡ cấm' });
+});
+
+// Soft delete user
+exports.deleteUser = catchAsync(async (req, res, next) => {
+	const id = Number(req.params.id);
+	if (isNaN(id)) return next(new AppError('ID không hợp lệ', 400));
+
+		const updated = await userService.softDeleteUserById(id);
+
+	if (updated.count === 0) return next(new AppError('Không tìm thấy user', 404));
+
+	res.status(200).json({ status: 'success', message: 'User đã được xóa (soft delete)' });
+});
+
+// legacy commented code kept for reference

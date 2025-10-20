@@ -8,12 +8,7 @@ const router = express.Router();
 router.use(authController.protect);
 router.use(authController.restrictTo('admin'));
 
-// ==================== USER MANAGEMENT ====================
-router.get('/users', adminController.getAllUsers);
-router.get('/users/:id', adminController.getUserDetails);
-router.patch('/users/:id/ban', adminController.banUser);
-router.patch('/users/:id/unban', adminController.unbanUser);
-router.delete('/users/:id', adminController.deleteUser);//Xóa mềm
+
 
 // ==================== DOCUMENT MANAGEMENT ====================
 // Xong router.patch('/documents/:id/reject', adminController.rejectDocument);

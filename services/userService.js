@@ -56,10 +56,57 @@ async function generateResetPasswordToken(userId) {
   return resetToken;
 }
 
+// Admin / management helpers
+async function listUsers() {
+  return prisma.user.findMany({
+    select: {
+      user_id: true,
+      full_name: true,
+      email: true,
+      role: true,
+      created_at: true,
+      password_changed_at: true,
+    },
+    orderBy: { created_at: 'desc' },
+  });
+}
+
+async function getUserById(id) {
+  return prisma.user.findUnique({
+    where: { user_id: Number(id) },
+    select: {
+      user_id: true,
+      full_name: true,
+      email: true,
+      role: true,
+      created_at: true,
+      password_changed_at: true,
+    },
+  });
+}
+
+async function banUserById(id) {
+  return prisma.user.updateMany({ where: { user_id: Number(id) }, data: { is_banned: true } });
+}
+
+async function unbanUserById(id) {
+  return prisma.user.updateMany({ where: { user_id: Number(id) }, data: { is_banned: false } });
+}
+
+async function softDeleteUserById(id) {
+  return prisma.user.updateMany({ where: { user_id: Number(id) }, data: { is_banned: true, email: null } });
+}
+
 module.exports = {
   createUser,
   findUserByEmail,
   correctPassword,
   changedPasswordAfter,
   generateResetPasswordToken,
+  listUsers,
+  getUserById,
+  banUserById,
+  unbanUserById,
+  softDeleteUserById,
 };
+
