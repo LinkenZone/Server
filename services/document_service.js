@@ -1,10 +1,5 @@
 const prisma = require('../utils/db');
-const {
-  indexDocument,
-  updateES,
-  deleteES,
-  search,
-} = require('../utils/elastic');
+const { indexDocument, updateES, deleteES, search } = require('../utils/elastic');
 
 // Tạo 1 dữ liệu trong bảng document
 async function createDocumentRecord(uploadResult, documentData, userId) {
@@ -43,7 +38,11 @@ async function createDocumentRecord(uploadResult, documentData, userId) {
     },
   };
   // Gửi dữ liệu document mới lên Elasticsearch để lập chỉ mục
-  await indexDocument(newDocWithUpload);
+  try {
+    await indexDocument(newDocWithUpload);
+  } catch (err) {
+    console.error('Elasticsearch indexing failed for new document:', err);
+  }
   return newDocWithUpload;
 }
 
@@ -155,7 +154,11 @@ async function deleteDocument(id) {
     },
   });
   // Xóa tài liệu trong Elasticsearch
-  await deleteES(deletedDoc.document_id);
+  try {
+    await deleteES(deletedDoc.document_id);
+  } catch (err) {
+    console.error('Error deleting document from Elasticsearch:', err);
+  }
   return deletedDoc;
 }
 
@@ -175,8 +178,98 @@ async function restoreDocument(id) {
     },
   });
   // Cập nhật lại tài liệu trong Elasticsearch
-  await updateES(restoreDoc);
+  try {
+    await updateES(restoreDoc);
+  } catch (err) {
+    console.error('Error updating document in Elasticsearch:', err);
+  }
   return restoreDoc;
+}
+
+async function forceDeleteDocument(id) {
+  const documentId = parseInt(id);
+  if (isNaN(documentId)) {
+    throw new Error('Document ID phải là một số hợp lệ');
+  }
+  
+  //Xoá vĩnh viễn các bình luận liên quan
+  await prisma.comment.deleteMany({ where: { document_id: documentId } });
+  // Xóa vĩnh viễn các đánh giá liên quan
+  await prisma.rating.deleteMany({ where: { document_id: documentId } });
+
+  // Xóa vĩnh viễn bài học
+  try {
+    const deleted = await prisma.document.delete({ where: { document_id: documentId } });
+    // Remove from Elasticsearch completely
+    try {
+      await deleteES(documentId, true);
+    } catch (err) {
+      console.error('Error hard-deleting document from Elasticsearch:', err);
+    }
+    return deleted;
+  } catch (err) {
+    throw err;
+  }
+}
+
+async function rejectAndDeleteDocument(id, rejectionReason = 'Tài liệu không hợp lệ') {
+  const documentId = parseInt(id);
+  if (isNaN(documentId)) {
+    throw new Error('Document ID phải là một số hợp lệ');
+  }
+  // Lấy thông tin tài liệu trước khi xóa
+  const document = await prisma.document.findUnique({
+    where: { document_id: documentId },
+    include: {
+      uploader: {
+        select: {
+          user_id: true,
+          full_name: true,
+          email: true,
+        },
+      },
+      subject: {
+        select: {
+          subject_name: true,
+          subject_code: true,
+        },
+      },
+      lecturer: {
+        select: {
+          lecturer_name: true,
+        },
+      },
+    },
+  });
+
+  if (!document) {
+    throw new Error('Document không tồn tại');
+  }
+  //Xóa tài liệu bị từ chối
+  await prisma.comment.deleteMany({ where: { document_id: documentId } });
+  await prisma.rating.deleteMany({ where: { document_id: documentId } });
+  await prisma.document.delete({ where: { document_id: documentId } });
+
+  // Also remove from Elasticsearch
+  try {
+    await deleteES(documentId, true);
+  } catch (err) {
+    console.error('Error removing rejected document from Elasticsearch:', err);
+  }
+
+  return {
+    success: true,
+    action: 'rejected_and_deleted',
+    message: 'Tài liệu đã bị từ chối',
+    deletedDocument: {
+      title: document.title,
+      uploader: document.uploader,
+      subject: document.subject?.subject_name,
+      lecturer: document.lecturer?.lecturer_name,
+      rejectionReason,
+      deletedAt: new Date(),
+    },
+  };
 }
 
 async function updateDocument(id, title, description) {
@@ -216,7 +309,11 @@ async function updateDocument(id, title, description) {
     },
   });
   // Cập nhật dữ liệu tài liệu trong Elasticsearch
-  await updateES(updatedDoc);
+  try {
+    await updateES(updatedDoc);
+  } catch (err) {
+    console.error('Error updating document in Elasticsearch:', err);
+  }
   return updatedDoc;
 }
 
@@ -262,6 +359,8 @@ module.exports = {
   getCommentCount,
   restoreDocument,
   updateDocument,
+  forceDeleteDocument,
+  rejectAndDeleteDocument,
   countDocument,
   approveDocument,
   searchDocuments,
