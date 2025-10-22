@@ -29,11 +29,11 @@ router.get(
   documentController.getDeletedFile
 );
 
-//Từ chối và xóa tài liệu
-router.patch(
-  '/:id/reject',
+// Lấy tất cả tài liệu
+router.get(
+  '/all-documents',
   authController.protect,
-  documentController.rejectAndDeleteDocument
+  documentController.getAllFiles
 );
 
 // Khôi phục file
@@ -52,9 +52,15 @@ router
   .delete(authController.protect, documentController.deleteFile);
 // Duyệt file
 router.patch(
-  '/approve/:id',
+  '/:id/approve',
   authController.protect,
   documentController.approveFile
+);
+//Từ chối và xóa tài liệu
+router.patch(
+  '/:id/reject',
+  authController.protect,
+  documentController.rejectFile
 );
 // Gắn route bình luận vào document
 router.use('/:id/comment', commentRoute);

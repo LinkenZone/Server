@@ -1,5 +1,11 @@
+const { get } = require('../routes/commentRoute');
 const prisma = require('../utils/db');
-const { indexDocument, updateES, deleteES, search } = require('../utils/elastic');
+const {
+  indexDocument,
+  updateES,
+  deleteES,
+  search,
+} = require('../utils/elastic');
 
 // Tạo 1 dữ liệu trong bảng document
 async function createDocumentRecord(uploadResult, documentData, userId) {
@@ -83,6 +89,21 @@ async function getAverageRating(documentId) {
 async function getCommentCount(documentId) {
   return prisma.comment.count({
     where: { document_id: documentId },
+  });
+}
+
+// Lấy tất cả tài liệu
+async function getAllDocuments() {
+  return prisma.document.findMany({
+    include: {
+      uploader: {
+        select: {
+          user_id: true,
+          full_name: true,
+          email: true,
+        },
+      },
+    },
   });
 }
 
@@ -191,7 +212,7 @@ async function forceDeleteDocument(id) {
   if (isNaN(documentId)) {
     throw new Error('Document ID phải là một số hợp lệ');
   }
-  
+
   //Xoá vĩnh viễn các bình luận liên quan
   await prisma.comment.deleteMany({ where: { document_id: documentId } });
   // Xóa vĩnh viễn các đánh giá liên quan
@@ -199,7 +220,9 @@ async function forceDeleteDocument(id) {
 
   // Xóa vĩnh viễn bài học
   try {
-    const deleted = await prisma.document.delete({ where: { document_id: documentId } });
+    const deleted = await prisma.document.delete({
+      where: { document_id: documentId },
+    });
     // Remove from Elasticsearch completely
     try {
       await deleteES(documentId, true);
@@ -212,7 +235,24 @@ async function forceDeleteDocument(id) {
   }
 }
 
-async function rejectAndDeleteDocument(id, rejectionReason = 'Tài liệu không hợp lệ') {
+// Duyệt tài liệu
+async function approveDocument(id) {
+  const approvedDoc = await prisma.document.update({
+    where: { document_id: id },
+    data: {
+      status: 'approved',
+      approved_at: new Date(),
+    },
+  });
+  // Cập nhật dữ liệu tài liệu trong Elasticsearch
+  await indexDocument(approvedDoc);
+  return approvedDoc;
+}
+
+async function rejectAndDeleteDocument(
+  id,
+  rejectionReason = 'Tài liệu không hợp lệ'
+) {
   const documentId = parseInt(id);
   if (isNaN(documentId)) {
     throw new Error('Document ID phải là một số hợp lệ');
@@ -323,19 +363,6 @@ async function countDocument(whereCondition) {
     where: whereCondition,
   });
 }
-// Duyệt tài liệu
-async function approveDocument(id) {
-  const approvedDoc = await prisma.document.update({
-    where: { document_id: id },
-    data: {
-      status: 'approved',
-      approved_at: new Date(),
-    },
-  });
-  // Cập nhật dữ liệu tài liệu trong Elasticsearch
-  await indexDocument(approvedDoc);
-  return approvedDoc;
-}
 
 async function searchDocuments(query) {
   try {
@@ -353,6 +380,7 @@ async function searchDocuments(query) {
 module.exports = {
   createDocumentRecord,
   getAllUserDocument,
+  getAllDocuments,
   getDocumentByID,
   deleteDocument,
   getAverageRating,
@@ -360,8 +388,8 @@ module.exports = {
   restoreDocument,
   updateDocument,
   forceDeleteDocument,
+  approveDocument,
   rejectAndDeleteDocument,
   countDocument,
-  approveDocument,
   searchDocuments,
 };

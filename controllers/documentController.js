@@ -87,6 +87,26 @@ exports.getDeletedFile = catchAsync(async (req, res, next) => {
   });
 });
 
+exports.getAllFiles = catchAsync(async (req, res, next) => {
+  // Kiểm tra user có phải admin không
+  if (!req.user || req.user.role !== 'admin') {
+    return next(
+      new AppError(
+        'Chỉ admin mới có quyền truy cập tài liệu toàn hệ thống',
+        403
+      )
+    );
+  }
+  const allDocuments = await documentService.getAllDocuments();
+  res.status(200).json({
+    status: 'success',
+    message: 'Lấy tài liệu toàn hệ thống thành công',
+    data: {
+      allDocuments,
+    },
+  });
+});
+
 exports.getFileDetails = catchAsync(async (req, res, next) => {
   // 1. Lấy id trên req.params
   const doc_id = req.params.id;
@@ -127,7 +147,30 @@ exports.updateFile = catchAsync(async (req, res, next) => {
   });
 });
 
-// Từ chối và xóa tài liệu từ chối 
+// Duyệt file
+exports.approveFile = catchAsync(async (req, res, next) => {
+  if (!req.user || req.user.role !== 'admin') {
+    return next(new AppError('Chỉ admin mới có quyền duyệt tài liệu', 403));
+  }
+
+  const document_id = Number(req.params.id);
+  const document = await documentService.getDocumentByID(document_id);
+
+  if (!document) {
+    return next(new AppError('Không tìm thấy file trong hệ thống', 404));
+  }
+
+  const approvedDocument = await documentService.approveDocument(document_id);
+  res.status(200).json({
+    status: 'success',
+    message: 'Duyệt file thành công',
+    data: {
+      approvedDocument,
+    },
+  });
+});
+
+// Từ chối và xóa tài liệu từ chối
 exports.rejectFile = catchAsync(async (req, res, next) => {
   if (!req.user || req.user.role !== 'admin') {
     return next(new AppError('Chỉ admin mới có quyền từ chối tài liệu', 403));
@@ -135,16 +178,21 @@ exports.rejectFile = catchAsync(async (req, res, next) => {
 
   const doc_id = Number(req.params.id);
   const doc = await documentService.getDocumentByID(doc_id);
-  
+
   if (!doc) {
     return next(new AppError('Không tìm thấy tài liệu', 404));
   }
 
   if (doc.status !== 'pending') {
-    return next(new AppError('Chỉ có thể từ chối tài liệu đang chờ duyệt', 400));
+    return next(
+      new AppError('Chỉ có thể từ chối tài liệu đang chờ duyệt', 400)
+    );
   }
 
-  const rejectDocument = await documentService.rejectAndDeleteDocument(doc_id, req.body.rejectionReason);
+  const rejectDocument = await documentService.rejectAndDeleteDocument(
+    doc_id,
+    req.body.rejectionReason
+  );
   res.status(200).json({
     status: 'success',
     message: 'Từ chối và xóa tài liệu thành công',
@@ -183,24 +231,6 @@ exports.restoreFile = catchAsync(async (req, res, next) => {
     message: 'Khôi phục file thành công',
     data: {
       restoredDocument,
-    },
-  });
-});
-
-exports.approveFile = catchAsync(async (req, res, next) => {
-  const document_id = Number(req.params.id);
-  const document = await documentService.getDocumentByID(document_id);
-
-  if (!document) {
-    return next(new AppError('Không tìm thấy file trong hệ thống', 404));
-  }
-
-  const approvedDocument = await documentService.approveDocument(document_id);
-  res.status(200).json({
-    status: 'success',
-    message: 'Duyệt file thành công',
-    data: {
-      approvedDocument,
     },
   });
 });
