@@ -42,6 +42,14 @@ router.patch(
   authController.protect,
   documentController.restoreFile
 );
+
+// Xóa vĩnh viễn file
+router.delete(
+  '/permanent',
+  authController.protect,
+  documentController.permanentDeleteFile
+);
+
 // Tìm kiếm tài liệu
 router.get('/search', documentController.searchFiles);
 

@@ -201,13 +201,19 @@ exports.rejectFile = catchAsync(async (req, res, next) => {
 });
 
 exports.deleteFile = catchAsync(async (req, res, next) => {
-  // 1. Kiểm tra file có tồn tại bằng req.param.id
+  // 1. Lấy document_id từ body hoặc params
   const doc_id = Number(req.params.id);
+
+  if (!doc_id || isNaN(doc_id)) {
+    return next(new AppError('Document ID không hợp lệ', 400));
+  }
+
   const document = await documentService.getDocumentByID(doc_id);
 
   if (!document) {
     return next(new AppError('Không tìm thấy file trong hệ thống', 404));
   }
+
   // 2. Nếu có thì cập nhật db
   await documentService.deleteDocument(doc_id);
 
@@ -220,11 +226,17 @@ exports.deleteFile = catchAsync(async (req, res, next) => {
 
 exports.restoreFile = catchAsync(async (req, res, next) => {
   const document_id = Number(req.body.document_id || req.params.id);
+
+  if (!document_id || isNaN(document_id)) {
+    return next(new AppError('Document ID không hợp lệ', 400));
+  }
+
   const document = await documentService.getDocumentByID(document_id);
 
   if (!document) {
     return next(new AppError('Không tìm thấy file trong hệ thống', 404));
   }
+
   const restoredDocument = await documentService.restoreDocument(document_id);
   res.status(200).json({
     status: 'success',
@@ -232,6 +244,26 @@ exports.restoreFile = catchAsync(async (req, res, next) => {
     data: {
       restoredDocument,
     },
+  });
+});
+
+exports.permanentDeleteFile = catchAsync(async (req, res, next) => {
+  const document_id = Number(req.body.document_id || req.params.id);
+
+  if (!document_id || isNaN(document_id)) {
+    return next(new AppError('Document ID không hợp lệ', 400));
+  }
+
+  const document = await documentService.getDocumentByID(document_id);
+
+  if (!document) {
+    return next(new AppError('Không tìm thấy file trong hệ thống', 404));
+  }
+
+  await documentService.forceDeleteDocument(document_id);
+  res.status(200).json({
+    status: 'success',
+    message: 'Xóa vĩnh viễn file thành công',
   });
 });
 
