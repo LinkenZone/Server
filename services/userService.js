@@ -66,6 +66,7 @@ async function listUsers() {
       role: true,
       created_at: true,
       password_changed_at: true,
+      is_banned: true,
     },
     orderBy: { created_at: 'desc' },
   });
@@ -81,20 +82,37 @@ async function getUserById(id) {
       role: true,
       created_at: true,
       password_changed_at: true,
+      is_banned: true,
     },
   });
 }
 
+async function changeUserRoleById(id, newRole) {
+  return prisma.user.updateMany({
+    where: { user_id: Number(id) },
+    data: { role: newRole },
+  });
+}
+
 async function banUserById(id) {
-  return prisma.user.updateMany({ where: { user_id: Number(id) }, data: { is_banned: true } });
+  return prisma.user.updateMany({
+    where: { user_id: Number(id) },
+    data: { is_banned: true },
+  });
 }
 
 async function unbanUserById(id) {
-  return prisma.user.updateMany({ where: { user_id: Number(id) }, data: { is_banned: false } });
+  return prisma.user.updateMany({
+    where: { user_id: Number(id) },
+    data: { is_banned: false },
+  });
 }
 
 async function softDeleteUserById(id) {
-  return prisma.user.updateMany({ where: { user_id: Number(id) }, data: { is_banned: true, email: null } });
+  return prisma.user.updateMany({
+    where: { user_id: Number(id) },
+    data: { is_banned: true, email: null },
+  });
 }
 
 module.exports = {
@@ -105,8 +123,8 @@ module.exports = {
   generateResetPasswordToken,
   listUsers,
   getUserById,
+  changeUserRoleById,
   banUserById,
   unbanUserById,
   softDeleteUserById,
 };
-

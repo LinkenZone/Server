@@ -28,6 +28,7 @@ model User {
   password_changed_at DateTime? @db.Timestamptz
   password_reset_token   String?   @db.VarChar(255)
   password_reset_expires DateTime?
+  is_banned    Boolean  @default(false) @map("is_banned")
   
   // Relations
   uploaded_documents Document[] @relation("DocumentUploader")
