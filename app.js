@@ -8,6 +8,7 @@ const hpp = require('hpp');
 const authRoute = require('./routes/authRoute');
 const documentRoute = require('./routes/documentRoute');
 const adminRoute = require('./routes/adminRoute');
+const userRoute = require('./routes/userRoute');
 const cors = require('cors');
 
 app.use(helmet());
@@ -61,7 +62,7 @@ app.use('/api/v1/auth', authRoute);
 app.use('/api/v1/document', documentRoute);
 app.use('/api/v1/admin', adminRoute);
 // app.use('/api/v1/tours', tourRoute);
-// app.use('/api/v1/users', userRoute);
+app.use('/api/v1/users', userRoute);
 // app.use('/api/v1/reviews', reviewRoute);
 
 app.all('*', (req, res, next) => {
