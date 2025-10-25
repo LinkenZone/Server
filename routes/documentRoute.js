@@ -53,6 +53,9 @@ router.delete(
 // Tìm kiếm tài liệu
 router.get('/search', documentController.searchFiles);
 
+// Download file
+router.get('/:id/download', documentController.downloadFile);
+
 router
   .route('/:id')
   .get(documentController.getFileDetails)

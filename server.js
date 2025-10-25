@@ -4,6 +4,7 @@ dotenv.config({ path: './config.env' });
 const app = require('./app');
 const prisma = require('./utils/db');
 const { elastic, reindexAllDocuments } = require('./utils/elastic');
+const { scheduleDeleteOldFiles } = require('./utils/schedule');
 //======================================================
 
 //Kết nối PostgreSQL
@@ -30,6 +31,10 @@ async function connectElastic() {
 connectElastic();
 // Chạy reindex tất cả document lên Elasticsearch
 reindexAllDocuments(prisma);
+//===================
+// Khởi động scheduled tasks
+scheduleDeleteOldFiles();
+console.log('✅ Scheduled tasks initialized');
 //===================
 //Chạy server
 const server = app.listen(process.env.PORT, () => {

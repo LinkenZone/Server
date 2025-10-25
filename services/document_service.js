@@ -5,6 +5,7 @@ const {
   deleteES,
   search,
 } = require('../utils/elastic');
+const { deleteFileByUrl } = require('./cloudinary_service');
 
 function validateAndParseId(id) {
   const documentId = parseInt(id);
@@ -124,6 +125,9 @@ async function getAllUserDocument(user_id, is_deleted) {
       description: true,
       file_url: true,
       file_type: true,
+      status: true,
+      uploaded_at: true,
+      approved_at: true,
     },
     orderBy: { uploaded_at: 'desc' },
   });
@@ -132,9 +136,12 @@ async function getAllUserDocument(user_id, is_deleted) {
 }
 
 async function getAllDocuments() {
-  return prisma.document.findMany({
+  const documents = await prisma.document.findMany({
     include: BASIC_DOCUMENT_INCLUDE,
+    orderBy: { uploaded_at: 'desc' },
   });
+
+  return Promise.all(documents.map(enrichDocumentWithStats));
 }
 
 async function getDocumentByID(id) {
@@ -193,16 +200,37 @@ async function restoreDocument(id) {
 async function forceDeleteDocument(id) {
   const documentId = validateAndParseId(id);
 
+  // Lấy thông tin document trước khi xóa (để có file_url)
+  const document = await prisma.document.findUnique({
+    where: { document_id: documentId },
+    select: { file_url: true },
+  });
+
+  if (!document) {
+    throw new Error('Document không tồn tại');
+  }
+
+  // Xóa dữ liệu liên quan
   await deleteRelatedData(documentId);
 
+  // Xóa document trong database
   const deleted = await prisma.document.delete({
     where: { document_id: documentId },
   });
 
+  // Xóa trong Elasticsearch
   await safeElasticsearchOperation(
     () => deleteES(documentId, true),
     'Error hard-deleting document from Elasticsearch:'
   );
+
+  // Xóa file trên Cloudinary
+  if (document.file_url) {
+    await safeElasticsearchOperation(
+      () => deleteFileByUrl(document.file_url),
+      'Error deleting file from Cloudinary:'
+    );
+  }
 
   return deleted;
 }
@@ -248,6 +276,14 @@ async function rejectAndDeleteDocument(
     () => deleteES(documentId, true),
     'Error removing rejected document from Elasticsearch:'
   );
+
+  // Xóa file trên Cloudinary
+  if (document.file_url) {
+    await safeElasticsearchOperation(
+      () => deleteFileByUrl(document.file_url),
+      'Error deleting rejected file from Cloudinary:'
+    );
+  }
 
   return {
     success: true,

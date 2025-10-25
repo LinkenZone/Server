@@ -1,6 +1,7 @@
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const documentService = require('./../services/document_service');
+const cloudinaryService = require('./../services/cloudinary_service');
 
 //Upload file lên cloudinary và tạo trong cdl - Cần tối ưu thêm + Xóa phần mở rộng khỏi tên tệp
 exports.uploadFile = catchAsync(async (req, res, next) => {
@@ -281,5 +282,163 @@ exports.searchFiles = catchAsync(async (req, res, next) => {
     data: {
       documents: results,
     },
+  });
+});
+
+exports.downloadFile = catchAsync(async (req, res, next) => {
+  const documentId = Number(req.params.id);
+
+  if (!documentId || isNaN(documentId)) {
+    return next(new AppError('Document ID không hợp lệ', 400));
+  }
+
+  // Lấy thông tin document
+  const document = await documentService.getDocumentByID(documentId);
+
+  if (!document) {
+    return next(new AppError('Không tìm thấy tài liệu', 404));
+  }
+  // Stream file từ Cloudinary về client với tên file đúng
+  const https = require('https');
+  const http = require('http');
+
+  // Lấy secure URL từ Cloudinary (đảm bảo có quyền truy cập)
+  const secureUrl = cloudinaryService.getSecureDownloadUrl(document.file_url);
+  const fileUrl = secureUrl || document.file_url;
+  const fileName = document.title;
+
+  console.log(`[DOWNLOAD] Document ID: ${documentId}`);
+  console.log(`[DOWNLOAD] Original URL: ${document.file_url}`);
+  console.log(`[DOWNLOAD] Secure URL: ${fileUrl}`);
+  console.log(`[DOWNLOAD] File Type: ${document.file_type}`);
+  console.log(`[DOWNLOAD] File Name: ${fileName}`);
+
+  // Xác định extension từ file_type hoặc URL
+  let extension = '';
+  if (document.file_type) {
+    const mimeToExt = {
+      'application/pdf': '.pdf',
+      'application/msword': '.doc',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+        '.docx',
+      'application/vnd.ms-excel': '.xls',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+        '.xlsx',
+      'application/vnd.ms-powerpoint': '.ppt',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation':
+        '.pptx',
+      'image/jpeg': '.jpg',
+      'image/png': '.png',
+      'image/gif': '.gif',
+      'text/plain': '.txt',
+    };
+    extension = mimeToExt[document.file_type] || '';
+  }
+
+  // Nếu fileName chưa có extension thì thêm vào
+  const finalFileName = fileName.includes('.')
+    ? fileName
+    : fileName + extension;
+
+  // Stream file từ Cloudinary
+  const protocol = fileUrl.startsWith('https') ? https : http;
+
+  const request = protocol.get(fileUrl, (cloudinaryResponse) => {
+    console.log(
+      `[DOWNLOAD] Cloudinary response status: ${cloudinaryResponse.statusCode}`
+    );
+    console.log(`[DOWNLOAD] Cloudinary headers:`, cloudinaryResponse.headers);
+
+    // Kiểm tra status code từ Cloudinary
+    if (cloudinaryResponse.statusCode !== 200) {
+      console.error(
+        `[DOWNLOAD ERROR] Cloudinary returned status ${cloudinaryResponse.statusCode} for ${fileUrl}`
+      );
+
+      // Đọc error message từ Cloudinary nếu có
+      let errorBody = '';
+      cloudinaryResponse.on('data', (chunk) => {
+        errorBody += chunk.toString();
+      });
+      cloudinaryResponse.on('end', () => {
+        console.error(`[DOWNLOAD ERROR] Cloudinary error body: ${errorBody}`);
+      });
+
+      return next(
+        new AppError(
+          `Không thể tải xuống tài liệu từ Cloudinary (HTTP ${cloudinaryResponse.statusCode})`,
+          500
+        )
+      );
+    }
+
+    // Set headers SAU KHI xác nhận file tồn tại
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${encodeURIComponent(finalFileName)}"`
+    );
+
+    // Ưu tiên Content-Type từ Cloudinary, fallback về database
+    const contentType =
+      cloudinaryResponse.headers['content-type'] ||
+      document.file_type ||
+      'application/octet-stream';
+    res.setHeader('Content-Type', contentType);
+
+    // Set Content-Length nếu có
+    if (cloudinaryResponse.headers['content-length']) {
+      res.setHeader(
+        'Content-Length',
+        cloudinaryResponse.headers['content-length']
+      );
+      console.log(
+        `[DOWNLOAD] File size: ${cloudinaryResponse.headers['content-length']} bytes`
+      );
+    }
+
+    // Pipe stream từ Cloudinary tới response
+    cloudinaryResponse.pipe(res);
+
+    // Handle lỗi từ stream
+    cloudinaryResponse.on('error', (error) => {
+      console.error(
+        '[DOWNLOAD ERROR] Error streaming file from Cloudinary:',
+        error
+      );
+      if (!res.headersSent) {
+        return next(new AppError('Lỗi khi tải xuống tài liệu', 500));
+      }
+    });
+
+    // Handle khi stream kết thúc
+    cloudinaryResponse.on('end', () => {
+      console.log(`[DOWNLOAD] Stream completed for document ${documentId}`);
+    });
+
+    // Handle lỗi khi ghi vào response
+    res.on('error', (error) => {
+      console.error('[DOWNLOAD ERROR] Error writing to response:', error);
+      cloudinaryResponse.destroy();
+    });
+  });
+
+  // Handle lỗi khi request tới Cloudinary
+  request.on('error', (error) => {
+    console.error(
+      '[DOWNLOAD ERROR] Error requesting file from Cloudinary:',
+      error
+    );
+    if (!res.headersSent) {
+      return next(new AppError('Không thể kết nối tới Cloudinary', 500));
+    }
+  });
+
+  // Set timeout cho request
+  request.setTimeout(30000, () => {
+    console.error('[DOWNLOAD ERROR] Request timeout');
+    request.destroy();
+    if (!res.headersSent) {
+      return next(new AppError('Timeout khi tải xuống tài liệu', 504));
+    }
   });
 });
