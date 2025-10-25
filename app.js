@@ -13,43 +13,55 @@ const cors = require('cors');
 
 app.use(helmet());
 
+// CORS Configuration - Allow frontend domain
+const allowedOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(',').map((url) => url.trim())
+  : ['http://localhost:5173'];
+
 app.use(
   cors({
-    origin: 'http://localhost:5173',
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
   })
 );
+
+app.use(hpp);
+
+//Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    message: 'Server is running',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
 
 //Đưa file tĩnh
 app.use(express.static(`${__dirname}/public`));
 
-//Giới hạn request - Sau khi xong BE sẽ uncomment phần này
-// const limiter = rateLimit({
-//   max: 100,
-//   windowMs: 60 * 60 * 1000,
-//   message: 'Đã đạt tới giới hạn request tối đa, hãy thử lại trong 1 giờ',
-// });
+const limiter = rateLimit({
+  max: 100,
+  windowMs: 60 * 60 * 1000,
+  message: 'Đã đạt tới giới hạn request tối đa, hãy thử lại trong 1 giờ',
+});
 
-// app.use('/api', limiter);
+app.use('/api', limiter);
 //========================
 
 //Body parser and reading data into req.body
 app.use(express.json({ limit: '100kb' }));
-
-//Tránh ô nhiễm tham sô url - làm sau
-// app.use(
-//   hpp({
-//     whitelist: [
-//       'duration',
-//       'ratingsQuantity',
-//       'ratingAverage',
-//       'maxGroupSize',
-//       'difficulty',
-//       'price',
-//     ],
-//   })
-// );
 
 //Middleware thêm thời gian request
 app.use((req, res, next) => {
@@ -61,9 +73,8 @@ app.use((req, res, next) => {
 app.use('/api/v1/auth', authRoute);
 app.use('/api/v1/document', documentRoute);
 app.use('/api/v1/admin', adminRoute);
-// app.use('/api/v1/tours', tourRoute);
 app.use('/api/v1/users', userRoute);
-// app.use('/api/v1/reviews', reviewRoute);
+
 
 app.all('*', (req, res, next) => {
   next(new AppError(`Không tìm thấy ${req.originalUrl} trên máy chủ`, 404));

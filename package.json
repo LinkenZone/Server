@@ -4,7 +4,11 @@
   "description": "Học Node.js, Express và MongoDB.",
   "main": "app.js",
   "scripts": {
-    "start": "nodemon server.js"
+    "prod": "node server.js",
+    "start": "nodemon server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate deploy",
+    "prisma:studio": "prisma studio"
   },
   "author": "",
   "license": "ISC",
