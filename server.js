@@ -1,6 +1,7 @@
 //=================Gọi các module=======================
 const dotenv = require('dotenv');
 dotenv.config({ path: './config.env' });
+dotenv.config({ path: './.env' });
 const app = require('./app');
 const prisma = require('./utils/db');
 const { elastic, reindexAllDocuments } = require('./utils/elastic');
