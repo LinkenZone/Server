@@ -37,7 +37,7 @@ scheduleDeleteOldFiles();
 console.log('✅ Scheduled tasks initialized');
 //===================
 //Chạy server
-const server = app.listen(process.env.PORT, () => {
+const server = app.listen(process.env.PORT, '0.0.0.0', () => {
   console.log(`Ứng dụng đang chạy trên cổng ${process.env.PORT}...`);
 });
 //============
