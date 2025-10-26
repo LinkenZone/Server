@@ -20,6 +20,9 @@ const createSignToken = (user, statusCode, res) => {
       Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000
     ),
     httpOnly: true,
+    path: '/',
+    secure: process.env.NODE_ENV === 'production', // chỉ gửi qua HTTPS
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // nếu frontend khác origin, dùng 'none'
   };
 
   if (process.env.NODE_ENV === 'production') cookieOption.secure = true;
