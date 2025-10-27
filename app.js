@@ -78,7 +78,6 @@ app.use('/api/v1/document', documentRoute);
 app.use('/api/v1/admin', adminRoute);
 app.use('/api/v1/users', userRoute);
 
-
 app.all('*', (req, res, next) => {
   next(new AppError(`Không tìm thấy ${req.originalUrl} trên máy chủ`, 404));
 });
