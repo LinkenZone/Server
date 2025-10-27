@@ -6,6 +6,9 @@ const app = require('./app');
 const prisma = require('./utils/db');
 const { elastic, reindexAllDocuments } = require('./utils/elastic');
 const { scheduleDeleteOldFiles } = require('./utils/schedule');
+const https = require('https');
+const http = require('http');
+const fs = require('fs');
 //======================================================
 
 //Kết nối PostgreSQL
@@ -38,9 +41,22 @@ scheduleDeleteOldFiles();
 console.log('✅ Scheduled tasks initialized');
 //===================
 //Chạy server
-const server = app.listen(process.env.PORT, '0.0.0.0', () => {
-  console.log(`Ứng dụng đang chạy trên cổng ${process.env.PORT}...`);
-});
+let server;
+
+if(process.env.NODE_ENV === 'production'){
+  const options = {
+    key: fs.readFileSync('/etc/letsencrypt/live/api.nguyentronghieu.io.vn/privkey.pem'),
+    cert: fs.readFileSync('/etc/letsencrypt/live/api.nguyentronghieu.io.vn/fullchain.pem')
+  };
+
+  server = https.createServer(options, app).listen(443, '0.0.0.0', () => {
+    console.log('✅ HTTPS Server đang chạy trên cổng 443');
+  });
+} else {
+  server = http.createServer(app).listen(process.env.PORT, '0.0.0.0', () => {
+    console.log(`HTTP Server đang chạy trên cổng ${process.env.PORT}...`);
+  });
+}
 //============
 //==================Xử lý có lỗi khi chạy ứng dụng thì ngừng ngay server==================
 process.on('unhandledRejection', (err) => {

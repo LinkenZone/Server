@@ -11,7 +11,14 @@ const adminRoute = require('./routes/adminRoute');
 const userRoute = require('./routes/userRoute');
 const cors = require('cors');
 
-app.use(helmet());
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    message: 'Server is running',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
 
 // CORS Configuration - Allow frontend domain
 const allowedOrigins = process.env.FRONTEND_URL
@@ -22,11 +29,15 @@ app.use(
   cors({
     origin: function (origin, callback) {
       // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-
+      if (!origin){
+	console.log("Đã chạy tới !origin");
+	return callback(null, true);
+      } 
       if (allowedOrigins.indexOf(origin) !== -1) {
+	console.log("Đã chạy tới bước 2");
         callback(null, true);
       } else {
+	console.log("Đã chạy tới bước 3");
         callback(new Error('Not allowed by CORS'));
       }
     },
@@ -36,17 +47,9 @@ app.use(
   })
 );
 
-app.use(hpp);
+app.use(helmet());
 
-//Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'success',
-    message: 'Server is running',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
-});
+app.use(hpp());
 
 //Đưa file tĩnh
 app.use(express.static(`${__dirname}/public`));
