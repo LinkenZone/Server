@@ -1,10 +1,6 @@
 const catchAsync = require('../utils/catchAsync');
-const reportsService = require('../services/reports_service');
 const AppError = require('../utils/appError');
-
-const catchAsync = require('../utils/catchAsync');
-const AppError = require('../utils/appError');
-const reportService = require('../services/report_service');
+const reportService = require('../services/reports_service');
 
 //Báo cáo tổng quan hệ thống
 exports.getSystemOverview = catchAsync(async (req, res, next) => {
@@ -20,10 +16,10 @@ exports.getSystemOverview = catchAsync(async (req, res, next) => {
 //Báo cáo thống kê tài liệu
 exports.getDocumentStatistics = catchAsync(async (req, res, next) => {
   const { startDate, endDate } = req.query;
-  
+
   const stats = await reportService.getDocumentStatistics({
     startDate,
-    endDate
+    endDate,
   });
 
   res.status(200).json({
@@ -48,10 +44,10 @@ exports.getTopUploaders = catchAsync(async (req, res, next) => {
 //Báo cáo thông kê người dùng theo thời gian lựa chọn
 exports.getUserStatistics = catchAsync(async (req, res, next) => {
   const { startDate, endDate } = req.query;
-  
+
   const stats = await reportService.getUserStatistics({
     startDate,
-    endDate
+    endDate,
   });
 
   res.status(200).json({
@@ -89,3 +85,36 @@ exports.getWeeklyReport = catchAsync(async (req, res, next) => {
   });
 });
 
+exports.getReport = catchAsync(async (req, res, next) => {
+  const report = await reportService.getDashboardReport();
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Lấy dữ liệu thành công',
+    data: report,
+  });
+});
+
+// Cập nhật dữ liệu dashboard report
+exports.updateReport = catchAsync(async (req, res, next) => {
+  const report = await reportService.updateDashboardReport(req.body);
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Cập nhật dữ liệu thành công',
+    data: report,
+  });
+});
+
+// Tăng số lượt truy cập (weekly_access) - Route public, không cần authentication
+exports.incrementVisit = catchAsync(async (req, res, next) => {
+  const report = await reportService.updateDashboardReport('weekly_access', 1);
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Đã ghi nhận lượt truy cập',
+    data: {
+      weekly_access: report.weekly_access,
+    },
+  });
+});

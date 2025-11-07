@@ -12,9 +12,21 @@ cloudinary.config({
 // cấu hình storage
 const storage = new CloudinaryStorage({
   cloudinary,
-  params: {
-    folder: 'linkenzone_uploads', // tên folder trên Cloudinary
-    resource_type: 'auto', // cho phép pdf, docx, image...
+  params: async (req, file) => {
+    const mimetype = (file.mimetype || '').toLowerCase();
+    const ext = (file.originalname || '').split('.').pop().toLowerCase();
+
+    let resource_type = 'raw';
+    if (mimetype.startsWith('image/')) resource_type = 'image';
+    else if (mimetype.startsWith('video/')) resource_type = 'video';
+
+    const publicId = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+    return {
+      folder: 'linkenzone_uploads',
+      resource_type,
+      public_id: resource_type === 'raw' ? `${publicId}.${ext}` : publicId,
+    };
   },
 });
 
@@ -27,8 +39,6 @@ async function deleteFile(publicId, resourceType = 'raw') {
       resource_type: resourceType,
       invalidate: true, // Xóa cache
     });
-
-    console.log(`Deleted file from Cloudinary: ${publicId}`, result);
     return result;
   } catch (error) {
     console.error(`Error deleting file from Cloudinary: ${publicId}`, error);
@@ -38,21 +48,30 @@ async function deleteFile(publicId, resourceType = 'raw') {
 
 function extractPublicIdFromUrl(url) {
   try {
-    if (!url) return null;
+    if (!url) {
+      console.error('extractPublicIdFromUrl: URL is null or undefined');
+      return null;
+    }
+
+    console.log('Extracting publicId from URL:', url);
 
     // Cloudinary URL format: https://res.cloudinary.com/{cloud_name}/{resource_type}/upload/{version}/{public_id}.{extension}
     const urlParts = url.split('/upload/');
-    if (urlParts.length < 2) return null;
+    if (urlParts.length < 2) {
+      console.error('extractPublicIdFromUrl: URL does not contain /upload/');
+      return null;
+    }
 
     // Lấy phần sau '/upload/'
-    const pathAfterUpload = urlParts[1];
+    let pathAfterUpload = urlParts[1];
 
-    // Bỏ version (v1234567890)
-    const pathWithoutVersion = pathAfterUpload.replace(/^v\d+\//, '');
+    // Bỏ version (v1234567890) nếu có
+    pathAfterUpload = pathAfterUpload.replace(/^v\d+\//, '');
 
-    // Bỏ extension
-    const publicId = pathWithoutVersion.replace(/\.[^.]+$/, '');
+    // Bỏ extension (phần cuối cùng sau dấu chấm)
+    const publicId = pathAfterUpload.replace(/\.[^/.]+$/, '');
 
+    console.log('Extracted publicId:', publicId);
     return publicId;
   } catch (error) {
     console.error('Error extracting public_id from URL:', error);
@@ -92,47 +111,9 @@ async function deleteFileByUrl(fileUrl) {
   }
 }
 
-/**
- * Lấy secure URL để download file từ Cloudinary
- * @param {string} fileUrl - URL của file trên Cloudinary
- * @returns {string} Secure download URL
- */
-function getSecureDownloadUrl(fileUrl) {
-  try {
-    if (!fileUrl) return null;
-
-    // Lấy public_id từ URL
-    const publicId = extractPublicIdFromUrl(fileUrl);
-    if (!publicId) return fileUrl; // Fallback về URL gốc nếu không extract được
-
-    // Xác định resource type từ URL
-    let resourceType = 'raw';
-    if (fileUrl.includes('/image/upload/')) {
-      resourceType = 'image';
-    } else if (fileUrl.includes('/video/upload/')) {
-      resourceType = 'video';
-    } else if (fileUrl.includes('/raw/upload/')) {
-      resourceType = 'raw';
-    }
-
-    // Tạo secure URL mới (không force download, giữ nguyên để stream)
-    const secureUrl = cloudinary.url(publicId, {
-      resource_type: resourceType,
-      type: 'upload',
-      secure: true,
-      sign_url: false, // Không cần sign vì chỉ cần access URL
-    });
-
-    return secureUrl;
-  } catch (error) {
-    console.error('Error getting secure download URL:', error);
-    return fileUrl; // Fallback về URL gốc
-  }
-}
-
 module.exports = {
   cloudinary,
   upload,
   deleteFileByUrl,
-  getSecureDownloadUrl,
+  extractPublicIdFromUrl,
 };

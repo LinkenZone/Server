@@ -53,8 +53,53 @@ router.delete(
 // Tìm kiếm tài liệu
 router.get('/search', documentController.searchFiles);
 
-// Download file
+// Get starred documents
+router.get(
+  '/starred',
+  authController.protect,
+  documentController.getStarredFiles
+);
+
+// Get recent documents
+router.get(
+  '/recent',
+  authController.protect,
+  documentController.getRecentFiles
+);
+
+// Get shared documents
+router.get(
+  '/shared',
+  authController.protect,
+  documentController.getSharedFiles
+);
+
+// Get storage statistics
+router.get(
+  '/storage-stats',
+  authController.protect,
+  documentController.getStorageStats
+);
+
+// Download file - Lấy URL từ Cloudinary
 router.get('/:id/download', documentController.downloadFile);
+
+// Toggle star
+router.patch(
+  '/:id/star',
+  authController.protect,
+  documentController.toggleStar
+);
+
+// Share document
+router.post(
+  '/:id/share',
+  authController.protect,
+  documentController.shareDocument
+);
+
+// Track access (middleware)
+router.use('/:id', authController.protect, documentController.trackAccess);
 
 router
   .route('/:id')

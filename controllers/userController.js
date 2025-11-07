@@ -4,7 +4,12 @@ const userService = require('../services/userService');
 
 // Get all users (admin)
 exports.getAllUsers = catchAsync(async (req, res, next) => {
+  console.log('📋 Getting all users - User:', req.user?.email);
+  console.log('📋 User role:', req.user?.role);
+
   const users = await userService.listUsers();
+
+  console.log('✅ Found users:', users.length);
 
   res.status(200).json({
     status: 'success',

@@ -65,6 +65,7 @@ model Document {
   description   String?        @db.Text
   file_url      String         @db.VarChar(255) @map("file_url")
   file_type     String?        @db.VarChar(100) @map("file_type")
+  file_size     BigInt?        @map("file_size")
   status        DocumentStatus @default(pending)
   uploader_id   Int?           @map("uploader_id")
   subject_id    Int?           @map("subject_id")
@@ -73,6 +74,9 @@ model Document {
   approved_at   DateTime?      @db.Timestamptz @map("approved_at")
   is_deleted    Boolean        @default(false) @map("is_deleted") 
   deleted_at    DateTime?      @db.Timestamptz @map("deleted_at") 
+  is_starred    Boolean        @default(false) @map("is_starred")
+  last_accessed DateTime?      @db.Timestamptz @map("last_accessed")
+  shared_with   Int[]          @default([]) @map("shared_with")
 
   // Relations
   uploader User?     @relation("DocumentUploader", fields: [uploader_id], references: [user_id], onDelete: SetNull)
@@ -86,6 +90,8 @@ model Document {
   @@index([subject_id])
   @@index([lecturer_id])
   @@index([is_deleted])
+  @@index([is_starred])
+  @@index([last_accessed])
   @@map("documents")
 }
 
@@ -121,4 +127,16 @@ model Comment {
   // Indexes
   @@index([document_id])
   @@map("comments")
+}
+
+model Report {
+  report_id          Int      @id @default(autoincrement()) @map("report_id")
+  today_upload       Int      @default(0) @map("today_upload")
+  today_new_user     Int      @default(0) @map("today_new_user")
+  weekly_access      Int      @default(0) @map("weekly_access")
+  total_download     Int      @default(0) @map("total_download")
+  updated_at         DateTime @default(now()) @updatedAt @db.Timestamptz @map("updated_at")
+  created_at         DateTime @default(now()) @db.Timestamptz @map("created_at")
+  
+  @@map("reports")
 }

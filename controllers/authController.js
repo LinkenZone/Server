@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const userService = require('./../services/userService');
 const prisma = require('../utils/db');
 const bcrypt = require('bcryptjs');
+const reportService = require('../services/reports_service');
 //=====================Phương thức bổ trợ====================
 const signToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -50,6 +51,7 @@ exports.signUp = catchAsync(async (req, res, next) => {
   // 2. Hash mật khẩu và tạo user bằng prisma
   const newUser = await userService.createUser({ name, email, password, role });
   // 3. Sinh token & trả về
+  reportService.updateDashboardReport('today_new_user');
   createSignToken(newUser, 201, res);
 });
 
