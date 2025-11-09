@@ -181,8 +181,8 @@ async function search(q) {
                 multi_match: {
                   query: q,
                   fields: [
-                    'title',
-                    'description',
+                    'title^3',
+                    'description^2',
                     'uploader_name',
                     'subject_name',
                     'lecturer_name',
@@ -191,7 +191,10 @@ async function search(q) {
                 },
               },
             ],
-            filter: [{ term: { is_deleted: false } }],
+            filter: [
+              { term: { is_deleted: false } },
+              { term: { status: 'approved' } },
+            ],
           },
         },
         sort: [{ uploaded_at: { order: 'desc' } }],

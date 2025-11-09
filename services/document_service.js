@@ -117,11 +117,6 @@ async function createDocumentRecord(uploadResult, documentData, userId) {
     },
   };
 
-  await safeElasticsearchOperation(
-    () => indexDocument(newDocWithUpload),
-    'Elasticsearch indexing failed for new document:'
-  );
-
   return newDocWithUpload;
 }
 
