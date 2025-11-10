@@ -150,6 +150,15 @@ async function getAllDocuments() {
   return Promise.all(documents.map(enrichDocumentWithStats));
 }
 
+async function getApprovedDocuments() {
+  const documents = await prisma.document.findMany({
+    where: { status: 'approved', is_deleted: false },
+    include: BASIC_DOCUMENT_INCLUDE,
+  });
+
+  return Promise.all(documents.map(enrichDocumentWithStats));
+}
+
 async function getDocumentByID(id) {
   const documentId = validateAndParseId(id);
 
@@ -594,6 +603,7 @@ module.exports = {
   createDocumentRecord,
   getAllUserDocument,
   getAllDocuments,
+  getApprovedDocuments,
   getDocumentByID,
 
   // Update

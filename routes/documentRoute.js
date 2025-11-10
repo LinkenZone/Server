@@ -36,6 +36,9 @@ router.get(
   documentController.getAllFiles
 );
 
+// Lấy tất cả tài liệu đã duyệt
+router.get('/approved-documents', documentController.getApprovedFiles);
+
 // Khôi phục file
 router.patch(
   '/restore',

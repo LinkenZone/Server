@@ -200,7 +200,7 @@ async function search(q) {
         sort: [{ uploaded_at: { order: 'desc' } }],
       },
     });
-    return result.hits.hits;
+    return result.hits.hits.map((hit) => hit._source);
   } catch (error) {
     console.error('Elasticsearch search error:', error);
     throw error;

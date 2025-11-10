@@ -108,6 +108,17 @@ exports.getAllFiles = catchAsync(async (req, res, next) => {
   });
 });
 
+exports.getApprovedFiles = catchAsync(async (req, res, next) => {
+  const approvedDocuments = await documentService.getApprovedDocuments();
+  res.status(200).json({
+    status: 'success',
+    message: 'Lấy tài liệu đã duyệt thành công',
+    data: {
+      documents: approvedDocuments,
+    },
+  });
+});
+
 exports.getFileDetails = catchAsync(async (req, res, next) => {
   // 1. Lấy id trên req.params
   const doc_id = req.params.id;
@@ -271,10 +282,6 @@ exports.permanentDeleteFile = catchAsync(async (req, res, next) => {
 exports.searchFiles = catchAsync(async (req, res, next) => {
   const query = req.query.q || '';
   const results = await documentService.searchDocuments(query);
-
-  if (!results || results.length === 0) {
-    return next(new AppError('Không tìm thấy tài liệu phù hợp', 404));
-  }
 
   res.status(200).json({
     status: 'success',
