@@ -1,9 +1,8 @@
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const documentService = require('./../services/document_service');
-const cloudinaryService = require('./../services/cloudinary_service');
+const reportService = require('../services/reports_service');
 
-//Upload file lên cloudinary và tạo trong cdl - Cần tối ưu thêm + Xóa phần mở rộng khỏi tên tệp
 exports.uploadFile = catchAsync(async (req, res, next) => {
   // Kiểm tra xem có file được upload không
   if (!req.file) {
@@ -30,7 +29,6 @@ exports.uploadFile = catchAsync(async (req, res, next) => {
     fileSize: req.file.size,
     publicId: req.file.filename,
   };
-
   // Bước 2: Tạo document record trong database
   const documentData = { title, description, subject_id, lecturer_id };
   const newDocument = await documentService.createDocumentRecord(
@@ -38,6 +36,8 @@ exports.uploadFile = catchAsync(async (req, res, next) => {
     documentData,
     req.user.user_id
   );
+
+  reportService.updateDashboardReport('today_upload');
 
   res.status(201).json({
     status: 'success',
@@ -104,6 +104,17 @@ exports.getAllFiles = catchAsync(async (req, res, next) => {
     message: 'Lấy tài liệu toàn hệ thống thành công',
     data: {
       allDocuments,
+    },
+  });
+});
+
+exports.getApprovedFiles = catchAsync(async (req, res, next) => {
+  const approvedDocuments = await documentService.getApprovedDocuments();
+  res.status(200).json({
+    status: 'success',
+    message: 'Lấy tài liệu đã duyệt thành công',
+    data: {
+      documents: approvedDocuments,
     },
   });
 });
@@ -272,10 +283,6 @@ exports.searchFiles = catchAsync(async (req, res, next) => {
   const query = req.query.q || '';
   const results = await documentService.searchDocuments(query);
 
-  if (!results || results.length === 0) {
-    return next(new AppError('Không tìm thấy tài liệu phù hợp', 404));
-  }
-
   res.status(200).json({
     status: 'success',
     message: 'Tìm kiếm tài liệu thành công',
@@ -285,161 +292,159 @@ exports.searchFiles = catchAsync(async (req, res, next) => {
   });
 });
 
+//Note: URL chuẩn để tải file https://res.cloudinary.com/dbbsalgdq/raw/upload/fl_attachment:${title}/v1762178201/linkenzone_uploads/ersqmdywza5edqbznxbq.pdf
 exports.downloadFile = catchAsync(async (req, res, next) => {
-  const documentId = Number(req.params.id);
+  const docId = Number(req.params.id);
 
-  if (!documentId || isNaN(documentId)) {
+  if (!docId || isNaN(docId)) {
     return next(new AppError('Document ID không hợp lệ', 400));
   }
 
-  // Lấy thông tin document
-  const document = await documentService.getDocumentByID(documentId);
+  const document = await documentService.getDocumentByID(docId);
 
   if (!document) {
     return next(new AppError('Không tìm thấy tài liệu', 404));
   }
-  // Stream file từ Cloudinary về client với tên file đúng
-  const https = require('https');
-  const http = require('http');
 
-  // Lấy secure URL từ Cloudinary (đảm bảo có quyền truy cập)
-  const secureUrl = cloudinaryService.getSecureDownloadUrl(document.file_url);
-  const fileUrl = secureUrl || document.file_url;
-  const fileName = document.title;
+  const fileName = document.title.split('.');
+  const downloadUrl = document.file_url.replace(
+    '/upload/',
+    `/upload/fl_attachment:${encodeURIComponent(fileName[0])}/`
+  );
 
-  console.log(`[DOWNLOAD] Document ID: ${documentId}`);
-  console.log(`[DOWNLOAD] Original URL: ${document.file_url}`);
-  console.log(`[DOWNLOAD] Secure URL: ${fileUrl}`);
-  console.log(`[DOWNLOAD] File Type: ${document.file_type}`);
-  console.log(`[DOWNLOAD] File Name: ${fileName}`);
+  reportService.updateDashboardReport('total_download');
 
-  // Xác định extension từ file_type hoặc URL
-  let extension = '';
-  if (document.file_type) {
-    const mimeToExt = {
-      'application/pdf': '.pdf',
-      'application/msword': '.doc',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-        '.docx',
-      'application/vnd.ms-excel': '.xls',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
-        '.xlsx',
-      'application/vnd.ms-powerpoint': '.ppt',
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation':
-        '.pptx',
-      'image/jpeg': '.jpg',
-      'image/png': '.png',
-      'image/gif': '.gif',
-      'text/plain': '.txt',
-    };
-    extension = mimeToExt[document.file_type] || '';
+  return res.status(200).json({
+    status: 'success',
+    message: 'Lấy link tải xuống thành công',
+    data: {
+      downloadUrl,
+      fileName,
+    },
+  });
+});
+
+// Toggle star/unstar document
+exports.toggleStar = catchAsync(async (req, res, next) => {
+  if (!req.user) {
+    return next(new AppError('Cần đăng nhập để thực hiện hành động này', 401));
   }
 
-  // Nếu fileName chưa có extension thì thêm vào
-  const finalFileName = fileName.includes('.')
-    ? fileName
-    : fileName + extension;
+  const docId = Number(req.params.id);
+  if (!docId || isNaN(docId)) {
+    return next(new AppError('Document ID không hợp lệ', 400));
+  }
 
-  // Stream file từ Cloudinary
-  const protocol = fileUrl.startsWith('https') ? https : http;
+  const document = await documentService.toggleStarDocument(
+    docId,
+    req.user.user_id
+  );
 
-  const request = protocol.get(fileUrl, (cloudinaryResponse) => {
-    console.log(
-      `[DOWNLOAD] Cloudinary response status: ${cloudinaryResponse.statusCode}`
-    );
-    console.log(`[DOWNLOAD] Cloudinary headers:`, cloudinaryResponse.headers);
-
-    // Kiểm tra status code từ Cloudinary
-    if (cloudinaryResponse.statusCode !== 200) {
-      console.error(
-        `[DOWNLOAD ERROR] Cloudinary returned status ${cloudinaryResponse.statusCode} for ${fileUrl}`
-      );
-
-      // Đọc error message từ Cloudinary nếu có
-      let errorBody = '';
-      cloudinaryResponse.on('data', (chunk) => {
-        errorBody += chunk.toString();
-      });
-      cloudinaryResponse.on('end', () => {
-        console.error(`[DOWNLOAD ERROR] Cloudinary error body: ${errorBody}`);
-      });
-
-      return next(
-        new AppError(
-          `Không thể tải xuống tài liệu từ Cloudinary (HTTP ${cloudinaryResponse.statusCode})`,
-          500
-        )
-      );
-    }
-
-    // Set headers SAU KHI xác nhận file tồn tại
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${encodeURIComponent(finalFileName)}"`
-    );
-
-    // Ưu tiên Content-Type từ Cloudinary, fallback về database
-    const contentType =
-      cloudinaryResponse.headers['content-type'] ||
-      document.file_type ||
-      'application/octet-stream';
-    res.setHeader('Content-Type', contentType);
-
-    // Set Content-Length nếu có
-    if (cloudinaryResponse.headers['content-length']) {
-      res.setHeader(
-        'Content-Length',
-        cloudinaryResponse.headers['content-length']
-      );
-      console.log(
-        `[DOWNLOAD] File size: ${cloudinaryResponse.headers['content-length']} bytes`
-      );
-    }
-
-    // Pipe stream từ Cloudinary tới response
-    cloudinaryResponse.pipe(res);
-
-    // Handle lỗi từ stream
-    cloudinaryResponse.on('error', (error) => {
-      console.error(
-        '[DOWNLOAD ERROR] Error streaming file from Cloudinary:',
-        error
-      );
-      if (!res.headersSent) {
-        return next(new AppError('Lỗi khi tải xuống tài liệu', 500));
-      }
-    });
-
-    // Handle khi stream kết thúc
-    cloudinaryResponse.on('end', () => {
-      console.log(`[DOWNLOAD] Stream completed for document ${documentId}`);
-    });
-
-    // Handle lỗi khi ghi vào response
-    res.on('error', (error) => {
-      console.error('[DOWNLOAD ERROR] Error writing to response:', error);
-      cloudinaryResponse.destroy();
-    });
+  res.status(200).json({
+    status: 'success',
+    message: document.is_starred ? 'Đã đánh dấu sao' : 'Đã bỏ đánh dấu sao',
+    data: { document },
   });
+});
 
-  // Handle lỗi khi request tới Cloudinary
-  request.on('error', (error) => {
-    console.error(
-      '[DOWNLOAD ERROR] Error requesting file from Cloudinary:',
-      error
-    );
-    if (!res.headersSent) {
-      return next(new AppError('Không thể kết nối tới Cloudinary', 500));
-    }
+// Get starred documents
+exports.getStarredFiles = catchAsync(async (req, res, next) => {
+  if (!req.user) {
+    return next(new AppError('Cần đăng nhập để thực hiện hành động này', 401));
+  }
+
+  const documents = await documentService.getStarredDocuments(req.user.user_id);
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Lấy danh sách tài liệu đánh dấu sao thành công',
+    data: { documents },
   });
+});
 
-  // Set timeout cho request
-  request.setTimeout(30000, () => {
-    console.error('[DOWNLOAD ERROR] Request timeout');
-    request.destroy();
-    if (!res.headersSent) {
-      return next(new AppError('Timeout khi tải xuống tài liệu', 504));
+// Get recent documents
+exports.getRecentFiles = catchAsync(async (req, res, next) => {
+  if (!req.user) {
+    return next(new AppError('Cần đăng nhập để thực hiện hành động này', 401));
+  }
+
+  const documents = await documentService.getRecentDocuments(req.user.user_id);
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Lấy danh sách tài liệu gần đây thành công',
+    data: { documents },
+  });
+});
+
+// Get shared documents
+exports.getSharedFiles = catchAsync(async (req, res, next) => {
+  if (!req.user) {
+    return next(new AppError('Cần đăng nhập để thực hiện hành động này', 401));
+  }
+
+  const documents = await documentService.getSharedDocuments(req.user.user_id);
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Lấy danh sách tài liệu được chia sẻ thành công',
+    data: { documents },
+  });
+});
+
+// Share document with users
+exports.shareDocument = catchAsync(async (req, res, next) => {
+  if (!req.user) {
+    return next(new AppError('Cần đăng nhập để thực hiện hành động này', 401));
+  }
+
+  const docId = Number(req.params.id);
+  const { userIds } = req.body;
+
+  if (!docId || isNaN(docId)) {
+    return next(new AppError('Document ID không hợp lệ', 400));
+  }
+
+  if (!Array.isArray(userIds) || userIds.length === 0) {
+    return next(
+      new AppError('Vui lòng cung cấp danh sách người dùng để chia sẻ', 400)
+    );
+  }
+
+  const document = await documentService.shareDocument(
+    docId,
+    req.user.user_id,
+    userIds
+  );
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Chia sẻ tài liệu thành công',
+    data: { document },
+  });
+});
+
+// Update last accessed (middleware này có thể gọi tự động khi view document)
+exports.trackAccess = catchAsync(async (req, res, next) => {
+  if (req.user) {
+    const docId = Number(req.params.id);
+    if (docId && !isNaN(docId)) {
+      await documentService.updateLastAccessed(docId, req.user.user_id);
     }
+  }
+  next();
+});
+
+// Get user storage statistics
+exports.getStorageStats = catchAsync(async (req, res) => {
+  const userId = req.user.user_id;
+  const stats = await documentService.getUserStorageStats(userId);
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      storage: stats,
+    },
   });
 });
 

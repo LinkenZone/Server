@@ -181,8 +181,8 @@ async function search(q) {
                 multi_match: {
                   query: q,
                   fields: [
-                    'title',
-                    'description',
+                    'title^3',
+                    'description^2',
                     'uploader_name',
                     'subject_name',
                     'lecturer_name',
@@ -191,13 +191,16 @@ async function search(q) {
                 },
               },
             ],
-            filter: [{ term: { is_deleted: false } }],
+            filter: [
+              { term: { is_deleted: false } },
+              { term: { status: 'approved' } },
+            ],
           },
         },
         sort: [{ uploaded_at: { order: 'desc' } }],
       },
     });
-    return result.hits.hits;
+    return result.hits.hits.map((hit) => hit._source);
   } catch (error) {
     console.error('Elasticsearch search error:', error);
     throw error;

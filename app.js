@@ -9,6 +9,7 @@ const authRoute = require('./routes/authRoute');
 const documentRoute = require('./routes/documentRoute');
 const adminRoute = require('./routes/adminRoute');
 const userRoute = require('./routes/userRoute');
+const reportRoute = require('./routes/reportsRoute');
 const cors = require('cors');
 
 app.get('/health', (req, res) => {
@@ -29,15 +30,12 @@ app.use(
   cors({
     origin: function (origin, callback) {
       // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin){
-	console.log("Đã chạy tới !origin");
-	return callback(null, true);
-      } 
+      if (!origin) {
+        return callback(null, true);
+      }
       if (allowedOrigins.indexOf(origin) !== -1) {
-	console.log("Đã chạy tới bước 2");
         callback(null, true);
       } else {
-	console.log("Đã chạy tới bước 3");
         callback(new Error('Not allowed by CORS'));
       }
     },
@@ -77,6 +75,7 @@ app.use('/api/v1/auth', authRoute);
 app.use('/api/v1/document', documentRoute);
 app.use('/api/v1/admin', adminRoute);
 app.use('/api/v1/users', userRoute);
+app.use('/api/v1/reports', reportRoute);
 
 app.all('*', (req, res, next) => {
   next(new AppError(`Không tìm thấy ${req.originalUrl} trên máy chủ`, 404));
