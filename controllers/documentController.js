@@ -442,3 +442,51 @@ exports.downloadFile = catchAsync(async (req, res, next) => {
     }
   });
 });
+
+// Lấy danh sách môn học tự nhiên (Natural)
+exports.getNaturalSubjectDocuments = catchAsync(async (req, res, next) => {
+  const documents = await documentService.getDocumentsBySubjectType('Natural');
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Lấy danh sách tài liệu môn học tự nhiên thành công',
+    results: documents.length,
+    data: {
+      documents,
+    },
+  });
+});
+
+// Lấy danh sách môn học xã hội (Social)
+exports.getSocialSubjectDocuments = catchAsync(async (req, res, next) => {
+  const documents = await documentService.getDocumentsBySubjectType('Social');
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Lấy danh sách tài liệu môn học xã hội thành công',
+    results: documents.length,
+    data: {
+      documents,
+    },
+  });
+});
+
+// Lấy danh sách các bài top rating
+exports.getTopRatedDocuments = catchAsync(async (req, res, next) => {
+  const limit = parseInt(req.query.limit) || 10;
+
+  if (limit < 1 || limit > 100) {
+    return next(new AppError('Limit phải từ 1 đến 100', 400));
+  }
+
+  const documents = await documentService.getTopRatedDocuments(limit);
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Lấy danh sách tài liệu top rating thành công',
+    results: documents.length,
+    data: {
+      documents,
+    },
+  });
+});

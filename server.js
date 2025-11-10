@@ -23,18 +23,18 @@ async function connectDB() {
 }
 connectDB();
 //Kết nối Elasticsearch
-async function connectElastic() {
-  try {
-    await elastic.ping();
-    console.log('✅ Kết nối Elasticsearch thành công');
-  } catch (err) {
-    console.error('❌ Lỗi kết nối Elasticsearch:', err);
-    process.exit(1);
-  }
-}
-connectElastic();
-// Chạy reindex tất cả document lên Elasticsearch
-reindexAllDocuments(prisma);
+// async function connectElastic() {
+//   try {
+//     await elastic.ping();
+//     console.log('✅ Kết nối Elasticsearch thành công');
+//   } catch (err) {
+//     console.error('❌ Lỗi kết nối Elasticsearch:', err);
+//     process.exit(1);
+//   }
+// }
+// connectElastic();
+// // Chạy reindex tất cả document lên Elasticsearch
+// reindexAllDocuments(prisma);
 //===================
 // Khởi động scheduled tasks
 scheduleDeleteOldFiles();

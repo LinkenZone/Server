@@ -337,6 +337,65 @@ async function searchDocuments(query) {
   }
 }
 
+async function getDocumentsBySubjectType(subjectType) {
+  const documents = await prisma.document.findMany({
+    where: {
+      status: 'approved',
+      is_deleted: false,
+      subject: {
+        subject_type: subjectType,
+      },
+    },
+    include: FULL_DOCUMENT_INCLUDE,
+    orderBy: { uploaded_at: 'desc' },
+  });
+
+  return Promise.all(documents.map(enrichDocumentWithStats));
+}
+
+async function getTopRatedDocuments(limit = 10) {
+  // Lấy tất cả documents đã được approved và không bị xóa
+  const documents = await prisma.document.findMany({
+    where: {
+      status: 'approved',
+      is_deleted: false,
+    },
+    include: FULL_DOCUMENT_INCLUDE,
+  });
+
+  // Tính average rating cho từng document
+  const documentsWithRating = await Promise.all(
+    documents.map(async (doc) => {
+      const avgRating = await getAverageRating(doc.document_id);
+      const commentCount = await getCommentCount(doc.document_id);
+      const ratingCount = await prisma.rating.count({
+        where: { document_id: doc.document_id },
+      });
+      
+      return {
+        ...doc,
+        avgRating,
+        commentCount,
+        ratingCount,
+      };
+    })
+  );
+
+  // Lọc những document có rating và sắp xếp theo avgRating giảm dần
+  const topRated = documentsWithRating
+    .filter((doc) => doc.avgRating !== null && doc.ratingCount > 0)
+    .sort((a, b) => {
+      // Sắp xếp theo avgRating giảm dần, nếu bằng nhau thì theo ratingCount
+      if (b.avgRating !== a.avgRating) {
+        return b.avgRating - a.avgRating;
+      }
+      return b.ratingCount - a.ratingCount;
+    })
+    .slice(0, limit);
+
+  return topRated;
+}
+
 // ==================== EXPORTS ====================
 
 module.exports = {
@@ -361,4 +420,8 @@ module.exports = {
   getCommentCount,
   countDocument,
   searchDocuments,
+  
+  // New functions
+  getDocumentsBySubjectType,
+  getTopRatedDocuments,
 };

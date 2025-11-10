@@ -38,10 +38,16 @@ model User {
   @@map("users")
 }
 
+enum SubjectType {
+  Natural
+  Social
+}
+
 model Subject {
   subject_id   Int    @id @default(autoincrement()) @map("subject_id")
   subject_name String @unique @db.VarChar(100) @map("subject_name")
   subject_code String? @unique @db.VarChar(20) @map("subject_code")
+  subject_type SubjectType? @map("subject_type")
   
   // Relations
   documents Document[]

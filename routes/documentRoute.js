@@ -36,6 +36,8 @@ router.get(
   documentController.getAllFiles
 );
 
+
+
 // Khôi phục file
 router.patch(
   '/restore',
@@ -52,6 +54,15 @@ router.delete(
 
 // Tìm kiếm tài liệu
 router.get('/search', documentController.searchFiles);
+
+// Lấy danh sách môn học tự nhiên
+router.get('/natural', documentController.getNaturalSubjectDocuments);
+
+// Lấy danh sách môn học xã hội
+router.get('/social', documentController.getSocialSubjectDocuments);
+
+// Lấy danh sách tài liệu top rating
+router.get('/top-rated', documentController.getTopRatedDocuments);
 
 // Download file
 router.get('/:id/download', documentController.downloadFile);
