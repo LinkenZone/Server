@@ -17,11 +17,29 @@ async function initializeElasticsearch() {
     await elastic.indices.create({
       index: 'documents',
       body: {
+        settings: {
+          analysis: {
+            analyzer: {
+              prefix_search: {
+                tokenizer: 'edge_ngram_tokenizer',
+                filter: ['lowercase'],
+              },
+            },
+            tokenizer: {
+              edge_ngram_tokenizer: {
+                type: 'edge_ngram',
+                min_gram: 1,
+                max_gram: 10,
+                token_chars: ['letter', 'digit'],
+              },
+            },
+          },
+        },
         mappings: {
           properties: {
             document_id: { type: 'integer' },
-            title: { type: 'text', analyzer: 'standard' },
-            description: { type: 'text', analyzer: 'standard' },
+            title: { type: 'text', analyzer: 'prefix_search' },
+            description: { type: 'text', analyzer: 'prefix_search' },
             file_url: { type: 'keyword' },
             file_type: { type: 'keyword' },
             status: { type: 'keyword' },
