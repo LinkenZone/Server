@@ -117,6 +117,11 @@ async function createDocumentRecord(uploadResult, documentData, userId) {
     },
   };
 
+  await safeElasticsearchOperation(
+    () => indexDocument(newDocWithUpload),
+    'Error indexing new document in Elasticsearch:'
+  );
+
   return newDocWithUpload;
 }
 
@@ -419,6 +424,11 @@ async function toggleStarDocument(documentId, userId) {
     where: { document_id: documentId },
     data: { is_starred: !document.is_starred },
   });
+
+  await safeElasticsearchOperation(
+    () => updateES(updatedDocument),
+    'Error updating starred status in Elasticsearch:'
+  );
 
   return updatedDocument;
 }

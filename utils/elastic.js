@@ -1,4 +1,5 @@
 const { Client } = require('@elastic/elasticsearch');
+const { comment } = require('./db');
 
 const elastic = new Client({ node: process.env.ELASTICSEARCH_URL });
 
@@ -38,16 +39,61 @@ async function initializeElasticsearch() {
         mappings: {
           properties: {
             document_id: { type: 'integer' },
-            title: { type: 'text', analyzer: 'prefix_search' },
-            description: { type: 'text', analyzer: 'prefix_search' },
+            title: {
+              type: 'text',
+              analyzer: 'prefix_search',
+              search_analyzer: 'standard',
+            },
+            description: {
+              type: 'text',
+              analyzer: 'prefix_search',
+              search_analyzer: 'standard',
+            },
             file_url: { type: 'keyword' },
             file_type: { type: 'keyword' },
+            file_size: { type: 'long' },
             status: { type: 'keyword' },
-            is_deleted: { type: 'boolean' },
-            uploader_name: { type: 'text', analyzer: 'standard' },
-            subject_name: { type: 'text', analyzer: 'standard' },
-            lecturer_name: { type: 'text', analyzer: 'standard' },
+            uploader_id: { type: 'integer' },
+            subject_id: { type: 'integer' },
+            lecturer_id: { type: 'integer' },
             uploaded_at: { type: 'date' },
+            approved_at: { type: 'date' },
+            is_deleted: { type: 'boolean' },
+            deleted_at: { type: 'date' },
+            is_starred: { type: 'boolean' },
+            last_accessed: { type: 'date' },
+            shared_with: { type: 'integer' },
+            avgRating: { type: 'float' },
+            commentCount: { type: 'integer' },
+            uploader: {
+              properties: {
+                user_id: { type: 'integer' },
+                full_name: {
+                  type: 'text',
+                  fields: { keyword: { type: 'keyword' } },
+                },
+                email: { type: 'keyword' },
+              },
+            },
+            subject: {
+              properties: {
+                subject_id: { type: 'integer' },
+                subject_name: {
+                  type: 'text',
+                  fields: { keyword: { type: 'keyword' } },
+                },
+                subject_code: { type: 'keyword' },
+              },
+            },
+            lecturer: {
+              properties: {
+                lecturer_id: { type: 'integer' },
+                lecturer_name: {
+                  type: 'text',
+                  fields: { keyword: { type: 'keyword' } },
+                },
+              },
+            },
           },
         },
       },
@@ -67,12 +113,38 @@ async function indexDocument(doc) {
     description: doc.description,
     file_url: doc.file_url,
     file_type: doc.file_type,
+    file_size: Number(doc.file_size),
     status: doc.status,
-    is_deleted: doc.is_deleted,
-    uploader_name: doc.uploader?.full_name,
-    subject_name: doc.subject?.subject_name,
-    lecturer_name: doc.lecturer?.lecturer_name,
+    uploader_id: doc.uploader?.user_id,
+    subject_id: doc.subject?.subject_id,
+    lecturer_id: doc.lecturer?.lecturer_id,
     uploaded_at: doc.uploaded_at,
+    approved_at: doc.approved_at,
+    is_deleted: doc.is_deleted,
+    deleted_at: doc.deleted_at,
+    is_starred: doc.is_starred,
+    last_accessed: doc.last_accessed,
+    shared_with: doc.shared_with,
+    uploader: doc.uploader
+      ? {
+          user_id: doc.uploader.user_id,
+          full_name: doc.uploader.full_name,
+          email: doc.uploader.email,
+        }
+      : null,
+    subject: doc.subject
+      ? {
+          subject_id: doc.subject.subject_id,
+          subject_name: doc.subject.subject_name,
+          subject_code: doc.subject.subject_code,
+        }
+      : null,
+    lecturer: doc.lecturer
+      ? {
+          lecturer_id: doc.lecturer.lecturer_id,
+          lecturer_name: doc.lecturer.lecturer_name,
+        }
+      : null,
   };
 
   await elastic.index({
@@ -153,12 +225,38 @@ async function updateES(doc) {
     description: doc.description,
     file_url: doc.file_url,
     file_type: doc.file_type,
+    file_size: Number(doc.file_size),
     status: doc.status,
-    is_deleted: doc.is_deleted,
-    uploader_name: doc.uploader?.full_name,
-    subject_name: doc.subject?.subject_name,
-    lecturer_name: doc.lecturer?.lecturer_name,
+    uploader_id: doc.uploader?.user_id,
+    subject_id: doc.subject?.subject_id,
+    lecturer_id: doc.lecturer?.lecturer_id,
     uploaded_at: doc.uploaded_at,
+    approved_at: doc.approved_at,
+    is_deleted: doc.is_deleted,
+    deleted_at: doc.deleted_at,
+    is_starred: doc.is_starred,
+    last_accessed: doc.last_accessed,
+    shared_with: doc.shared_with,
+    uploader: doc.uploader
+      ? {
+          user_id: doc.uploader.user_id,
+          full_name: doc.uploader.full_name,
+          email: doc.uploader.email,
+        }
+      : null,
+    subject: doc.subject
+      ? {
+          subject_id: doc.subject.subject_id,
+          subject_name: doc.subject.subject_name,
+          subject_code: doc.subject.subject_code,
+        }
+      : null,
+    lecturer: doc.lecturer
+      ? {
+          lecturer_id: doc.lecturer.lecturer_id,
+          lecturer_name: doc.lecturer.lecturer_name,
+        }
+      : null,
   };
 
   await elastic.update({
@@ -191,6 +289,7 @@ async function search(q) {
   try {
     const result = await elastic.search({
       index: 'documents',
+      min_score: 1,
       body: {
         query: {
           bool: {
@@ -209,13 +308,9 @@ async function search(q) {
                 },
               },
             ],
-            filter: [
-              { term: { is_deleted: false } },
-              { term: { status: 'approved' } },
-            ],
+            filter: [{ term: { is_deleted: false } }],
           },
         },
-        sort: [{ uploaded_at: { order: 'desc' } }],
       },
     });
     return result.hits.hits.map((hit) => hit._source);
