@@ -125,6 +125,8 @@ async function indexDocument(doc) {
     is_starred: doc.is_starred,
     last_accessed: doc.last_accessed,
     shared_with: doc.shared_with,
+    avgRating: doc.avgRating,
+    commentCount: doc.commentCount,
     uploader: doc.uploader
       ? {
           user_id: doc.uploader.user_id,
@@ -237,6 +239,8 @@ async function updateES(doc) {
     is_starred: doc.is_starred,
     last_accessed: doc.last_accessed,
     shared_with: doc.shared_with,
+    avgRating: doc.avgRating,
+    commentCount: doc.commentCount,
     uploader: doc.uploader
       ? {
           user_id: doc.uploader.user_id,
