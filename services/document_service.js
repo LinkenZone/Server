@@ -430,7 +430,13 @@ async function toggleStarDocument(documentId, userId) {
     'Error updating starred status in Elasticsearch:'
   );
 
-  return updatedDocument;
+  // Convert BigInt to String for JSON serialization
+  const docToReturn = { ...updatedDocument };
+  if (docToReturn.file_size !== null && docToReturn.file_size !== undefined) {
+    docToReturn.file_size = docToReturn.file_size.toString();
+  }
+
+  return docToReturn;
 }
 
 // Update last accessed time
@@ -478,7 +484,13 @@ async function shareDocument(documentId, userId, sharedUserIds) {
     },
   });
 
-  return updatedDocument;
+  // Convert BigInt to String for JSON serialization
+  const docToReturn = { ...updatedDocument };
+  if (docToReturn.file_size !== null && docToReturn.file_size !== undefined) {
+    docToReturn.file_size = docToReturn.file_size.toString();
+  }
+
+  return docToReturn;
 }
 
 // Get starred documents
