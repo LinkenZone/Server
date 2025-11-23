@@ -423,18 +423,19 @@ async function toggleStarDocument(documentId, userId) {
   const updatedDocument = await prisma.document.update({
     where: { document_id: documentId },
     data: { is_starred: !document.is_starred },
+    include: BASIC_DOCUMENT_INCLUDE,
   });
-
-  await safeElasticsearchOperation(
-    () => updateES(updatedDocument),
-    'Error updating starred status in Elasticsearch:'
-  );
 
   // Convert BigInt to String for JSON serialization
   const docToReturn = { ...updatedDocument };
   if (docToReturn.file_size !== null && docToReturn.file_size !== undefined) {
     docToReturn.file_size = docToReturn.file_size.toString();
   }
+
+  await safeElasticsearchOperation(
+    () => updateES(docToReturn),
+    'Error updating starred status in Elasticsearch:'
+  );
 
   return docToReturn;
 }
