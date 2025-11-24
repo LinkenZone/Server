@@ -10,6 +10,7 @@ const documentRoute = require('./routes/documentRoute');
 const adminRoute = require('./routes/adminRoute');
 const userRoute = require('./routes/userRoute');
 const reportRoute = require('./routes/reportsRoute');
+const tagRoute = require('./routes/tagRoute');
 const cors = require('cors');
 
 app.get('/health', (req, res) => {
@@ -76,6 +77,7 @@ app.use('/api/v1/document', documentRoute);
 app.use('/api/v1/admin', adminRoute);
 app.use('/api/v1/users', userRoute);
 app.use('/api/v1/reports', reportRoute);
+app.use('/api/v1/tags', tagRoute);
 
 app.all('*', (req, res, next) => {
   next(new AppError(`Không tìm thấy ${req.originalUrl} trên máy chủ`, 404));

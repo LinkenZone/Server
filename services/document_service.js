@@ -39,6 +39,11 @@ async function enrichDocumentWithStats(doc) {
     docWithStats.file_size = docWithStats.file_size.toString();
   }
 
+  // Transform tags from DocumentTag[] to Tag[]
+  if (docWithStats.tags && Array.isArray(docWithStats.tags)) {
+    docWithStats.tags = docWithStats.tags.map((dt) => dt.tag);
+  }
+
   return docWithStats;
 }
 
@@ -80,6 +85,11 @@ const FULL_DOCUMENT_INCLUDE = {
   uploader: { select: UPLOADER_SELECT },
   subject: { select: SUBJECT_SELECT },
   lecturer: { select: LECTURER_SELECT },
+  tags: {
+    select: {
+      tag: true,
+    },
+  },
 };
 
 const BASIC_DOCUMENT_INCLUDE = {

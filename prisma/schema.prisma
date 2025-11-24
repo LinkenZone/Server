@@ -84,6 +84,7 @@ model Document {
   lecturer Lecturer? @relation(fields: [lecturer_id], references: [lecturer_id], onDelete: SetNull)
   ratings  Rating[]
   comments Comment[]
+  tags     DocumentTag[]
 
   // Indexes
   @@index([uploader_id])
@@ -139,4 +140,32 @@ model Report {
   created_at         DateTime @default(now()) @db.Timestamptz @map("created_at")
   
   @@map("reports")
+}
+
+model Tag {
+  tag_id      Int      @id @default(autoincrement()) @map("tag_id")
+  tag_name    String   @unique @db.VarChar(50) @map("tag_name")
+  description String?  @db.Text
+  color       String?  @db.VarChar(20) // hex color for UI
+  created_at  DateTime @default(now()) @db.Timestamptz @map("created_at")
+  updated_at  DateTime @updatedAt @db.Timestamptz @map("updated_at")
+  
+  // Relations
+  documents DocumentTag[]
+  
+  @@map("tags")
+}
+
+model DocumentTag {
+  document_id Int @map("document_id")
+  tag_id      Int @map("tag_id")
+  created_at  DateTime @default(now()) @db.Timestamptz @map("created_at")
+  
+  // Relations
+  document Document @relation(fields: [document_id], references: [document_id], onDelete: Cascade)
+  tag      Tag      @relation(fields: [tag_id], references: [tag_id], onDelete: Cascade)
+  
+  @@id([document_id, tag_id])
+  @@index([tag_id])
+  @@map("document_tags")
 }

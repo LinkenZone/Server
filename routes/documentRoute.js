@@ -101,14 +101,20 @@ router.post(
   documentController.shareDocument
 );
 
-// Track access (middleware)
-router.use('/:id', authController.protect, documentController.trackAccess);
-
 router
   .route('/:id')
   .get(documentController.getFileDetails)
   .patch(authController.protect, documentController.updateFile)
   .delete(authController.protect, documentController.deleteFile);
+
+// Track access (middleware) - chỉ cho các route cần authentication
+router.use('/:id/star', authController.protect, documentController.trackAccess);
+router.use(
+  '/:id/share',
+  authController.protect,
+  documentController.trackAccess
+);
+
 // Duyệt file
 router.patch(
   '/:id/approve',

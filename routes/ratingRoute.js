@@ -4,7 +4,10 @@ const authController = require('./../controllers/authController');
 
 const router = express.Router({ mergeParams: true });
 
-router.post('/', authController.protect, ratingController.addRating);
+router
+  .route('/')
+  .get(ratingController.getRatings)
+  .post(authController.protect, ratingController.addRating);
 
 router
   .route('/:ratingId')

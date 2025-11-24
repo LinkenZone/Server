@@ -185,7 +185,7 @@ async function getDashboardReport() {
   }
 
   // Tính toán các thông số động từ database
-  const [pendingDocs, totalFiles, totalAccounts, totalComments] =
+  const [pendingDocs, totalFiles, totalAccounts, totalComments, totalRatings] =
     await Promise.all([
       // Tổng số tài liệu chờ duyệt
       prisma.document.count({
@@ -199,6 +199,8 @@ async function getDashboardReport() {
       prisma.user.count(),
       // Tổng số bình luận
       prisma.comment.count(),
+      // Tổng số lượt đánh giá
+      prisma.rating.count(),
     ]);
   // Trả về report với các thông số được tính động
   return {
@@ -207,6 +209,7 @@ async function getDashboardReport() {
     total_files: totalFiles,
     total_accounts: totalAccounts,
     total_comments: totalComments,
+    total_ratings: totalRatings,
   };
 }
 
