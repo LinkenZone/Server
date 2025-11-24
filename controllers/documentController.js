@@ -447,3 +447,47 @@ exports.getStorageStats = catchAsync(async (req, res) => {
     },
   });
 });
+
+// Lấy danh sách tags của document
+exports.getDocumentTags = catchAsync(async (req, res, next) => {
+  const documentId = Number(req.params.id);
+
+  if (!documentId || isNaN(documentId)) {
+    return next(new AppError('Document ID không hợp lệ', 400));
+  }
+
+  const tags = await documentService.getDocumentTags(documentId);
+
+  res.status(200).json({
+    status: 'success',
+    data: { tags },
+  });
+});
+
+// Cập nhật tags của document (admin only)
+exports.updateDocumentTags = catchAsync(async (req, res, next) => {
+  // Kiểm tra quyền admin
+  if (!req.user || req.user.role !== 'admin') {
+    return next(new AppError('Chỉ admin mới có quyền cập nhật tags', 403));
+  }
+
+  const documentId = Number(req.params.id);
+  const { tagIds, newTags } = req.body;
+
+  if (!documentId || isNaN(documentId)) {
+    return next(new AppError('Document ID không hợp lệ', 400));
+  }
+
+  // tagIds: array of existing tag IDs
+  // newTags: array of new tag objects { tag_name, description, color }
+  const result = await documentService.updateDocumentTags(documentId, {
+    tagIds: tagIds || [],
+    newTags: newTags || [],
+  });
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Cập nhật tags thành công',
+    data: result,
+  });
+});

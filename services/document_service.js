@@ -94,6 +94,11 @@ const FULL_DOCUMENT_INCLUDE = {
 
 const BASIC_DOCUMENT_INCLUDE = {
   uploader: { select: UPLOADER_SELECT },
+  tags: {
+    select: {
+      tag: true,
+    },
+  },
 };
 
 // ==================== MAIN FUNCTIONS ====================
@@ -387,124 +392,167 @@ async function getUserStorageStats(userId) {
     : '0';
   const totalDocuments = result._count.document_id;
 
-  // Giả sử limit là 10GB = 10 * 1024 * 1024 * 1024 bytes
-  const storageLimit = (10 * 1024 * 1024 * 1024).toString();
-
   return {
     totalSize,
     totalDocuments,
-    storageLimit,
-    usagePercentage: result._sum.file_size
-      ? Number(
-          (
-            (Number(result._sum.file_size) / (10 * 1024 * 1024 * 1024)) *
-            100
-          ).toFixed(2)
-        )
-      : 0,
   };
 }
 
-async function countDocument(whereCondition) {
-  return prisma.document.count({
-    where: whereCondition,
-  });
-}
+// ============== TAG MANAGEMENT ==============
 
-async function searchDocuments(query) {
-  return search(query);
-}
+// Lấy tất cả tags của một document
+async function getDocumentTags(documentId) {
+  const parsedId = validateAndParseId(documentId);
 
-// Toggle star/unstar document
-async function toggleStarDocument(documentId, userId) {
-  const document = await prisma.document.findUnique({
-    where: { document_id: documentId },
-  });
-
-  if (!document) {
-    throw new Error('Không tìm thấy tài liệu');
-  }
-
-  // Check if user owns the document
-  if (document.uploader_id !== userId) {
-    throw new Error('Bạn không có quyền đánh dấu tài liệu này');
-  }
-
-  const updatedDocument = await prisma.document.update({
-    where: { document_id: documentId },
-    data: { is_starred: !document.is_starred },
-    include: BASIC_DOCUMENT_INCLUDE,
-  });
-
-  // Convert BigInt to String for JSON serialization
-  const docToReturn = { ...updatedDocument };
-  if (docToReturn.file_size !== null && docToReturn.file_size !== undefined) {
-    docToReturn.file_size = docToReturn.file_size.toString();
-  }
-
-  await safeElasticsearchOperation(
-    () => updateES(docToReturn),
-    'Error updating starred status in Elasticsearch:'
-  );
-
-  return docToReturn;
-}
-
-// Update last accessed time
-async function updateLastAccessed(documentId, userId) {
-  const document = await prisma.document.findUnique({
-    where: { document_id: documentId },
-  });
-
-  if (!document) {
-    throw new Error('Không tìm thấy tài liệu');
-  }
-
-  // Only update if user owns or has access to the document
-  if (
-    document.uploader_id === userId ||
-    document.shared_with.includes(userId)
-  ) {
-    await prisma.document.update({
-      where: { document_id: documentId },
-      data: { last_accessed: new Date() },
-    });
-  }
-}
-
-// Share document with users
-async function shareDocument(documentId, userId, sharedUserIds) {
-  const document = await prisma.document.findUnique({
-    where: { document_id: documentId },
-  });
-
-  if (!document) {
-    throw new Error('Không tìm thấy tài liệu');
-  }
-
-  if (document.uploader_id !== userId) {
-    throw new Error('Chỉ người tải lên mới có thể chia sẻ tài liệu');
-  }
-
-  const updatedDocument = await prisma.document.update({
-    where: { document_id: documentId },
-    data: {
-      shared_with: {
-        set: [...new Set([...document.shared_with, ...sharedUserIds])],
-      },
+  const documentTags = await prisma.documentTag.findMany({
+    where: { document_id: parsedId },
+    include: {
+      tag: true,
     },
   });
 
-  // Convert BigInt to String for JSON serialization
-  const docToReturn = { ...updatedDocument };
-  if (docToReturn.file_size !== null && docToReturn.file_size !== undefined) {
-    docToReturn.file_size = docToReturn.file_size.toString();
-  }
-
-  return docToReturn;
+  return documentTags.map((dt) => dt.tag);
 }
 
-// Get starred documents
+// Cập nhật tags của document (thêm, xóa, tạo mới)
+async function updateDocumentTags(documentId, { tagIds, newTags }) {
+  const parsedId = validateAndParseId(documentId);
+
+  // Kiểm tra document có tồn tại không
+  const document = await prisma.document.findUnique({
+    where: { document_id: parsedId },
+  });
+
+  if (!document) {
+    throw new Error('Document không tồn tại');
+  }
+
+  // Bước 1: Tạo tags mới nếu có
+  const createdTags = [];
+  if (newTags && newTags.length > 0) {
+    for (const newTag of newTags) {
+      if (!newTag.tag_name || newTag.tag_name.trim() === '') {
+        continue;
+      }
+
+      // Kiểm tra tag đã tồn tại chưa
+      const existingTag = await prisma.tag.findUnique({
+        where: { tag_name: newTag.tag_name.trim() },
+      });
+
+      if (existingTag) {
+        // Nếu tag đã tồn tại, thêm vào danh sách tagIds
+        if (!tagIds.includes(existingTag.tag_id)) {
+          tagIds.push(existingTag.tag_id);
+        }
+      } else {
+        // Tạo tag mới
+        const created = await prisma.tag.create({
+          data: {
+            tag_name: newTag.tag_name.trim(),
+            description: newTag.description || null,
+            color: newTag.color || null,
+          },
+        });
+        createdTags.push(created);
+        tagIds.push(created.tag_id);
+      }
+    }
+  }
+
+  // Bước 2: Xóa tất cả tags hiện tại của document
+  await prisma.documentTag.deleteMany({
+    where: { document_id: parsedId },
+  });
+
+  // Bước 3: Thêm các tags mới
+  if (tagIds && tagIds.length > 0) {
+    const documentTagsData = tagIds.map((tagId) => ({
+      document_id: parsedId,
+      tag_id: tagId,
+    }));
+
+    await prisma.documentTag.createMany({
+      data: documentTagsData,
+      skipDuplicates: true,
+    });
+  }
+
+  // Bước 4: Lấy danh sách tags sau khi cập nhật
+  const updatedTags = await getDocumentTags(parsedId);
+
+  return {
+    tags: updatedTags,
+    createdTags,
+    message: 'Cập nhật tags thành công',
+  };
+}
+
+// ============== STARRED, RECENT, SHARED DOCUMENTS ==============
+async function searchDocuments(query) {
+  // Get search results from Elasticsearch
+  const results = await search(query);
+
+  // Enrich each document with tags from database
+  const enrichedResults = await Promise.all(
+    results.map(async (doc) => {
+      const fullDoc = await prisma.document.findUnique({
+        where: { document_id: doc.document_id },
+        include: {
+          tags: {
+            select: {
+              tag: true,
+            },
+          },
+        },
+      });
+
+      // Transform tags
+      const tags = fullDoc?.tags ? fullDoc.tags.map((dt) => dt.tag) : [];
+
+      return {
+        ...doc,
+        tags,
+      };
+    })
+  );
+
+  return enrichedResults;
+}
+// Toggle star/unstar document
+async function toggleStarDocument(documentId, userId) {
+  const parsedId = validateAndParseId(documentId);
+
+  const document = await prisma.document.findUnique({
+    where: { document_id: parsedId },
+  });
+
+  if (!document) {
+    throw new Error('Document không tồn tại');
+  }
+
+  // Check if user is the owner
+  if (document.uploader_id !== userId) {
+    throw new Error('Chỉ có thể đánh dấu sao tài liệu của chính bạn');
+  }
+
+  const newStarredStatus = !document.is_starred;
+
+  const updatedDoc = await prisma.document.update({
+    where: { document_id: parsedId },
+    data: {
+      is_starred: newStarredStatus,
+      last_accessed: new Date(),
+    },
+  });
+
+  return {
+    ...updatedDoc,
+    file_size: updatedDoc.file_size ? updatedDoc.file_size.toString() : null,
+  };
+}
+
+// Get starred documents for a user
 async function getStarredDocuments(userId) {
   const documents = await prisma.document.findMany({
     where: {
@@ -512,85 +560,36 @@ async function getStarredDocuments(userId) {
       is_starred: true,
       is_deleted: false,
     },
-    select: {
-      document_id: true,
-      title: true,
-      description: true,
-      file_url: true,
-      file_type: true,
-      file_size: true,
-      status: true,
-      uploaded_at: true,
-      approved_at: true,
-      is_starred: true,
-      last_accessed: true,
-      uploader: {
-        select: {
-          user_id: true,
-          full_name: true,
-          email: true,
-        },
-      },
-      subject: true,
-      lecturer: true,
+    include: BASIC_DOCUMENT_INCLUDE,
+    orderBy: {
+      last_accessed: 'desc',
     },
-    orderBy: { uploaded_at: 'desc' },
   });
 
-  const enrichedDocuments = await Promise.all(
-    documents.map(enrichDocumentWithStats)
-  );
-
-  return enrichedDocuments;
+  return Promise.all(documents.map(enrichDocumentWithStats));
 }
 
-// Get recent documents (accessed in last 30 days)
-async function getRecentDocuments(userId) {
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
+// Get recent documents for a user
+async function getRecentDocuments(userId, limit = 20) {
   const documents = await prisma.document.findMany({
     where: {
       uploader_id: userId,
       is_deleted: false,
       last_accessed: {
-        gte: thirtyDaysAgo,
+        not: null,
       },
     },
-    select: {
-      document_id: true,
-      title: true,
-      description: true,
-      file_url: true,
-      file_type: true,
-      file_size: true,
-      status: true,
-      uploaded_at: true,
-      approved_at: true,
-      is_starred: true,
-      last_accessed: true,
-      uploader: {
-        select: {
-          user_id: true,
-          full_name: true,
-          email: true,
-        },
-      },
-      subject: true,
-      lecturer: true,
+    include: BASIC_DOCUMENT_INCLUDE,
+    orderBy: {
+      last_accessed: 'desc',
     },
-    orderBy: { last_accessed: 'desc' },
-    take: 50, // Limit to 50 recent documents
+    take: limit,
   });
 
-  const enrichedDocuments = await Promise.all(
-    documents.map(enrichDocumentWithStats)
-  );
-
-  return enrichedDocuments;
+  return Promise.all(documents.map(enrichDocumentWithStats));
 }
 
-// Get shared documents
+// Get shared documents (documents shared with the user)
 async function getSharedDocuments(userId) {
   const documents = await prisma.document.findMany({
     where: {
@@ -599,36 +598,61 @@ async function getSharedDocuments(userId) {
       },
       is_deleted: false,
     },
-    select: {
-      document_id: true,
-      title: true,
-      description: true,
-      file_url: true,
-      file_type: true,
-      file_size: true,
-      status: true,
-      uploaded_at: true,
-      approved_at: true,
-      is_starred: true,
-      last_accessed: true,
-      uploader: {
-        select: {
-          user_id: true,
-          full_name: true,
-          email: true,
-        },
-      },
-      subject: true,
-      lecturer: true,
+    include: BASIC_DOCUMENT_INCLUDE,
+    orderBy: {
+      uploaded_at: 'desc',
     },
-    orderBy: { uploaded_at: 'desc' },
   });
 
-  const enrichedDocuments = await Promise.all(
-    documents.map(enrichDocumentWithStats)
-  );
+  return Promise.all(documents.map(enrichDocumentWithStats));
+}
 
-  return enrichedDocuments;
+// Share document with other users
+async function shareDocument(documentId, ownerId, userIds) {
+  const parsedId = validateAndParseId(documentId);
+
+  const document = await prisma.document.findUnique({
+    where: { document_id: parsedId },
+  });
+
+  if (!document) {
+    throw new Error('Document không tồn tại');
+  }
+
+  // Check if user is the owner
+  if (document.uploader_id !== ownerId) {
+    throw new Error('Chỉ có thể chia sẻ tài liệu của chính bạn');
+  }
+
+  // Add new user IDs to shared_with array
+  const currentSharedWith = document.shared_with || [];
+  const updatedSharedWith = [...new Set([...currentSharedWith, ...userIds])];
+
+  const updatedDoc = await prisma.document.update({
+    where: { document_id: parsedId },
+    data: {
+      shared_with: updatedSharedWith,
+    },
+  });
+
+  return {
+    ...updatedDoc,
+    file_size: updatedDoc.file_size ? updatedDoc.file_size.toString() : null,
+    shared_with_count: updatedSharedWith.length,
+  };
+}
+
+// Update last accessed time for a document
+async function updateLastAccessed(documentId, userId) {
+  const parsedId = validateAndParseId(documentId);
+
+  // Update last accessed time
+  await prisma.document.update({
+    where: { document_id: parsedId },
+    data: {
+      last_accessed: new Date(),
+    },
+  });
 }
 
 module.exports = {
@@ -638,13 +662,10 @@ module.exports = {
   getAllDocuments,
   getApprovedDocuments,
   getDocumentByID,
-
+  searchDocuments,
   // Update
   updateDocument,
   approveDocument,
-  toggleStarDocument,
-  updateLastAccessed,
-  shareDocument,
 
   // Delete
   deleteDocument,
@@ -655,12 +676,17 @@ module.exports = {
   // Utilities
   getAverageRating,
   getCommentCount,
-  countDocument,
-  searchDocuments,
   getUserStorageStats,
 
-  // New features
+  // Tag management
+  getDocumentTags,
+  updateDocumentTags,
+
+  // Starred, recent, shared documents
+  toggleStarDocument,
   getStarredDocuments,
   getRecentDocuments,
   getSharedDocuments,
+  shareDocument,
+  updateLastAccessed,
 };

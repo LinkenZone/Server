@@ -132,4 +132,12 @@ router.use('/:id/comment', commentRoute);
 // Gắn route đánh giá vào document
 router.use('/:id/rating', ratingRoute);
 
+// Quản lý tags của document (admin only)
+router.get('/:id/tags', documentController.getDocumentTags);
+router.put(
+  '/:id/tags',
+  authController.protect,
+  documentController.updateDocumentTags
+);
+
 module.exports = router;

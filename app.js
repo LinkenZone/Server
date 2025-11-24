@@ -53,13 +53,13 @@ app.use(hpp());
 //Đưa file tĩnh
 app.use(express.static(`${__dirname}/public`));
 
-const limiter = rateLimit({
-  max: 100,
-  windowMs: 60 * 60 * 1000,
-  message: 'Đã đạt tới giới hạn request tối đa, hãy thử lại trong 1 giờ',
-});
+// const limiter = rateLimit({
+//   max: 100,
+//   windowMs: 60 * 60 * 1000,
+//   message: 'Đã đạt tới giới hạn request tối đa, hãy thử lại trong 1 giờ',
+// });
 
-app.use('/api', limiter);
+// app.use('/api', limiter);
 //========================
 
 //Body parser and reading data into req.body
