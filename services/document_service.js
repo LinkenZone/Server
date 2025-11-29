@@ -170,13 +170,23 @@ async function getAllDocuments() {
   return Promise.all(documents.map(enrichDocumentWithStats));
 }
 
-async function getApprovedDocuments() {
-  const documents = await prisma.document.findMany({
-    where: { status: 'approved', is_deleted: false },
-    include: BASIC_DOCUMENT_INCLUDE,
-  });
+async function getApprovedDocuments(page, pageSize) {
+  const [documents, total] = await Promise.all([
+    prisma.document.findMany({
+      where: { status: 'approved', is_deleted: false },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: BASIC_DOCUMENT_INCLUDE,
+    }),
+    prisma.document.count({
+      where: { status: 'approved', is_deleted: false },
+    }),
+  ]);
 
-  return Promise.all(documents.map(enrichDocumentWithStats));
+  return {
+    documents: await Promise.all(documents.map(enrichDocumentWithStats)),
+    total,
+  };
 }
 
 async function getDocumentByID(id) {
@@ -489,13 +499,13 @@ async function updateDocumentTags(documentId, { tagIds, newTags }) {
 }
 
 // ============== STARRED, RECENT, SHARED DOCUMENTS ==============
-async function searchDocuments(query) {
+async function searchDocuments(query, page, limit) {
   // Get search results from Elasticsearch
-  const results = await search(query);
+  const results = await search(query, page, limit);
 
   // Enrich each document with tags from database
   const enrichedResults = await Promise.all(
-    results.map(async (doc) => {
+    results.documents.map(async (doc) => {
       const fullDoc = await prisma.document.findUnique({
         where: { document_id: doc.document_id },
         include: {
@@ -517,7 +527,7 @@ async function searchDocuments(query) {
     })
   );
 
-  return enrichedResults;
+  return { documents: enrichedResults, total: results.total };
 }
 // Toggle star/unstar document
 async function toggleStarDocument(documentId, userId) {

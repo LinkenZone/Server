@@ -3,6 +3,18 @@ const { comment } = require('./db');
 
 const elastic = new Client({ node: process.env.ELASTICSEARCH_URL });
 
+function getElasticPagination({ page, limit }) {
+  // Nếu không phân trang → Không dùng from và size
+  if (!page || !limit) {
+    return { size: 10000 }; // Giới hạn tối đa 10.000 kết quả
+  }
+
+  return {
+    from: (page - 1) * limit,
+    size: limit,
+  };
+}
+
 // Khởi tạo index và mapping
 async function initializeElasticsearch() {
   try {
@@ -289,10 +301,13 @@ async function deleteES(docId, hardDelete = false) {
   }
 }
 
-async function search(q) {
+async function search(q, page, limit) {
   try {
+    const pagination = getElasticPagination({ page, limit });
+
     const result = await elastic.search({
       index: 'documents',
+      ...pagination,
       min_score: 1,
       body: {
         query: {
@@ -317,7 +332,10 @@ async function search(q) {
         },
       },
     });
-    return result.hits.hits.map((hit) => hit._source);
+    return {
+      documents: result.hits.hits.map((hit) => hit._source),
+      total: result.hits.total.value,
+    };
   } catch (error) {
     console.error('Elasticsearch search error:', error);
     throw error;

@@ -109,12 +109,22 @@ exports.getAllFiles = catchAsync(async (req, res, next) => {
 });
 
 exports.getApprovedFiles = catchAsync(async (req, res, next) => {
-  const approvedDocuments = await documentService.getApprovedDocuments();
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 10;
+
+  const approvedDocuments = await documentService.getApprovedDocuments(
+    page,
+    limit
+  );
   res.status(200).json({
     status: 'success',
     message: 'Lấy tài liệu đã duyệt thành công',
     data: {
-      documents: approvedDocuments,
+      page: Number(page),
+      pageSize: Number(limit),
+      total: approvedDocuments.total,
+      totalPages: Math.ceil(approvedDocuments.total / limit),
+      documents: approvedDocuments.documents,
     },
   });
 });
@@ -280,14 +290,18 @@ exports.permanentDeleteFile = catchAsync(async (req, res, next) => {
 });
 
 exports.searchFiles = catchAsync(async (req, res, next) => {
-  const query = req.query.q || '';
-  const results = await documentService.searchDocuments(query);
+  const { q, page, limit } = req.query;
+  const results = await documentService.searchDocuments(q, page, limit);
 
   res.status(200).json({
     status: 'success',
     message: 'Tìm kiếm tài liệu thành công',
     data: {
-      documents: results,
+      page: Number(page),
+      pageSize: Number(limit),
+      total: results.total,
+      totalPages: Math.ceil(results.total / limit),
+      documents: results.documents,
     },
   });
 });
